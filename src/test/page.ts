@@ -21,12 +21,17 @@ export type ItemView =
   | { title: string; state: 'withheld' }
   | { title: string; state: 'covered'; reason: string };
 
+/** Names an item in test output, for example by its title. */
+export type TitleOf = (item: Element) => string;
+
+const wholeText: TitleOf = (item) => (item.textContent ?? '').replace(/\s+/g, ' ').trim();
+
 /** What the user sees for each item matching `selector`. */
-export function viewItems(selector: string): ItemView[] {
-  return Array.from(document.querySelectorAll(selector), viewItem);
+export function viewItems(selector: string, titleOf: TitleOf = wholeText): ItemView[] {
+  return Array.from(document.querySelectorAll(selector), (item) => viewItem(item, titleOf));
 }
 
-export function viewItem(item: Element): ItemView {
+export function viewItem(item: Element, titleOf: TitleOf = wholeText): ItemView {
   const title = titleOf(item);
   const label = coverLabel(item);
   if (label !== null) return { title, state: 'covered', reason: label };
@@ -34,15 +39,10 @@ export function viewItem(item: Element): ItemView {
   return { title, state: 'shown' };
 }
 
-export function coveredTitles(selector: string): string[] {
-  return viewItems(selector)
+export function coveredTitles(selector: string, titleOf: TitleOf = wholeText): string[] {
+  return viewItems(selector, titleOf)
     .filter((view) => view.state === 'covered')
     .map((view) => view.title);
-}
-
-function titleOf(item: Element): string {
-  const heading = item.querySelector('h3');
-  return (heading?.textContent ?? item.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
 const coverOf = (item: Element) => item.querySelector(COVER_TAG)?.shadowRoot ?? null;

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { startPageGuard, type PageGuard } from '@/guard/page-guard';
-import { coveredTitles, renderPage, settle, viewItem, viewItems } from '@/test/page';
+import { renderPage, settle } from '@/test/page';
+import { coveredTitles, viewItem, viewItems } from './fixtures/view';
 import { youtube } from './adapter';
 import homeFeed from './fixtures/home-feed.html?raw';
 import { homeFeedTile } from './fixtures/tile';
@@ -79,6 +80,23 @@ describe('YouTube home feed with the ready-made GTA 6 topic', () => {
       { title: 'The whole Leonida map, mapped', state: 'covered', reason: 'GTA 6' },
       { title: 'Cats knocking things off tables', state: 'shown' },
     ]);
+  });
+
+  it('covers only the outer item when YouTube wraps a covered item in another one', async () => {
+    guard = startPageGuard(youtube);
+    renderPage(homeFeed);
+    await settle();
+    const lockup = homeFeedTile('Leonida weather report').querySelector('yt-lockup-view-model')!;
+    document.body.append(lockup);
+    await settle();
+
+    const tile = document.createElement('ytd-rich-item-renderer');
+    tile.append(lockup);
+    document.querySelector('ytd-rich-grid-renderer #contents')!.append(tile);
+    await settle();
+
+    expect(viewItem(tile)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(tile.querySelectorAll('blackout-cover')).toHaveLength(1);
   });
 
   it('re-checks a tile when YouTube reuses it for another video', async () => {

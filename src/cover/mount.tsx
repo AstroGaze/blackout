@@ -40,8 +40,12 @@ export function mountCover(item: Element, props: CoverProps): void {
   ] as const) {
     host.style.setProperty(property, value, 'important');
   }
-  // Keep clicks on the cover from reaching the site's own handlers.
-  host.addEventListener('click', (event) => event.stopPropagation());
+  // Keep clicks on the cover from reaching the site's own handlers, or following
+  // the link when the covered item is a link itself.
+  host.addEventListener('click', (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+  });
 
   const shadow = host.attachShadow({ mode: 'open' });
   const style = doc.createElement('style');

@@ -1,10 +1,22 @@
+import type { CoverLayout } from '@/cover/cover';
 import type { Site } from '@/protection/state';
+
+export type { CoverLayout };
+
+/** One kind of checkable item on a site, such as a video tile or a comment. */
+export interface ItemKind {
+  selector: string;
+  cover: CoverLayout;
+}
 
 /** What a page guard needs to know about one site. Adapters contain no matching logic. */
 export interface SiteAdapter {
   site: Site;
-  /** Selectors for every kind of checkable item on the site. */
-  itemSelectors: string[];
+  /**
+   * Every kind of checkable item on the site. When items nest, only the
+   * outermost one is checked and covered, together with everything inside it.
+   */
+  itemKinds: ItemKind[];
   /** All the text of an item that should be checked. */
   itemText(item: Element): string;
   /**

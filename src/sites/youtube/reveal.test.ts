@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { startPageGuard, type PageGuard } from '@/guard/page-guard';
-import { clickCoverButton, isKeyboardReachable, settle, viewItem } from '@/test/page';
+import { clickCoverButton, isKeyboardReachable, settle } from '@/test/page';
+import { viewItem } from './fixtures/view';
 import { youtube } from './adapter';
 import { homeFeedTile } from './fixtures/tile';
 

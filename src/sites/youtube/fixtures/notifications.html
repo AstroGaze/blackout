@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--
+  Hand-written: notifications need a signed-in account, so this can't be saved
+  from a logged-out session. It follows YouTube's notification menu markup
+  (yt-multi-page-menu-section-renderer > ytd-notification-renderer). Replace it
+  with a saved snapshot when one is available.
+-->
+<html>
+  <body>
+    <ytd-popup-container>
+      <ytd-multi-page-menu-renderer>
+        <div id="sections">
+          <yt-multi-page-menu-section-renderer>
+            <div id="items">
+              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=trailer3"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">Rockstar Games uploaded: Grand Theft Auto VI Trailer 3</yt-formatted-string><div class="metadata"><yt-formatted-string>2 hours ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
+              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=beast"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">MrBeast uploaded: I Survived 100 Days In A Desert</yt-formatted-string><div class="metadata"><yt-formatted-string>5 hours ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
+              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=lucia"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">Vice City Daily uploaded: Lucia's full story so far</yt-formatted-string><div class="metadata"><yt-formatted-string>1 day ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
+              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=bourne"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">Movie Recaps uploaded: Jason Bourne in 10 minutes</yt-formatted-string><div class="metadata"><yt-formatted-string>2 days ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
+            </div>
+          </yt-multi-page-menu-section-renderer>
+        </div>
+      </ytd-multi-page-menu-renderer>
+    </ytd-popup-container>
+  </body>
+</html>

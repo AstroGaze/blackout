@@ -1,7 +1,7 @@
 import { COVER_TAG, mountCover, unmountCover } from '@/cover/mount';
 import { compileMatcher, type HideReason, type Matcher } from '@/matcher/matcher';
 import { protectionState } from '@/protection/state';
-import type { SiteAdapter } from '@/sites/adapter';
+import type { CoverLayout, SiteAdapter } from '@/sites/adapter';
 
 export interface PageGuard {
   stop(): void;
@@ -10,16 +10,19 @@ export interface PageGuard {
 /**
  * Item states, kept in a data attribute the hide-first stylesheet reads.
  * No attribute means the item hasn't passed a check yet, so it stays hidden.
+ * "nested" marks an item inside another one, which is checked as part of it.
  */
 const STATE_ATTRIBUTE = 'data-blackout';
-type ItemState = 'clean' | 'covered' | 'revealed';
+type ItemState = 'clean' | 'covered' | 'revealed' | 'nested';
 
-function hideFirstCss(selector: string): string {
-  const items = `:is(${selector})`;
+/** Plain selector lists rather than :is(), which some engines evaluate unreliably. */
+function hideFirstCss(selectors: string[]): string {
+  const each = (suffix: string) => selectors.map((selector) => selector + suffix).join(',\n');
+  const covered = `[${STATE_ATTRIBUTE}="covered"]`;
   return `
-${items}:not([${STATE_ATTRIBUTE}]) { visibility: hidden !important; }
-${items}[${STATE_ATTRIBUTE}="covered"] { position: relative !important; overflow: hidden !important; }
-${items}[${STATE_ATTRIBUTE}="covered"] > :not(${COVER_TAG}) {
+${each(`:not([${STATE_ATTRIBUTE}])`)} { visibility: hidden !important; }
+${each(covered)} { position: relative !important; overflow: hidden !important; }
+${each(`${covered} > :not(${COVER_TAG})`)} {
   filter: blur(24px) !important;
   pointer-events: none !important;
   user-select: none !important;
@@ -46,10 +49,21 @@ function setState(item: Element, state: ItemState | null) {
  * checked stays hidden.
  */
 export function startPageGuard(adapter: SiteAdapter): PageGuard {
-  const selector = adapter.itemSelectors.join(', ');
+  const selectors = adapter.itemKinds.map((kind) => kind.selector);
+  const selector = selectors.join(', ');
+  const coverLayoutOf = (item: Element): CoverLayout =>
+    adapter.itemKinds.find((kind) => item.matches(kind.selector))?.cover ?? 'card';
+  /** The item an element belongs to: the outermost one, when items nest. */
+  const itemOf = (element: Element): Element | null => {
+    let item = element.closest(selector);
+    for (let outer = item?.parentElement?.closest(selector); outer; outer = outer.parentElement?.closest(selector)) {
+      item = outer;
+    }
+    return item;
+  };
 
   const style = document.createElement('style');
-  style.textContent = hideFirstCss(selector);
+  style.textContent = hideFirstCss(selectors);
   document.documentElement.append(style);
 
   let matcher: Matcher | null = null;
@@ -74,6 +88,7 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
   const cover = (item: Element, reason: HideReason, key: string) => {
     setState(item, 'covered');
     mountCover(item, {
+      layout: coverLayoutOf(item),
       topicName: reason.topicName,
       onReveal: () => {
         revealedKeys.set(item, key);
@@ -83,6 +98,11 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
   };
 
   const check = (item: Element) => {
+    for (const nested of item.querySelectorAll(selector)) {
+      // It may have been an item of its own before the site wrapped it.
+      unmountCover(nested);
+      setState(nested, 'nested');
+    }
     if (!matcher) {
       awaitingMatcher.add(item);
       return;
@@ -114,13 +134,14 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
         record.target.nodeType === Node.ELEMENT_NODE
           ? (record.target as Element)
           : record.target.parentElement;
-      const enclosing = target?.closest(selector);
+      const enclosing = target && itemOf(target);
       if (enclosing) items.add(enclosing);
       for (const node of record.addedNodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
-        const element = node as Element;
-        if (element.matches(selector)) items.add(element);
-        for (const item of element.querySelectorAll(selector)) items.add(item);
+        for (const element of [node as Element, ...(node as Element).querySelectorAll(selector)]) {
+          const item = itemOf(element);
+          if (item) items.add(item);
+        }
       }
     }
     return items;
@@ -134,7 +155,7 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     subtree: true,
     characterData: true,
   });
-  for (const item of document.querySelectorAll(selector)) awaitingMatcher.add(item);
+  for (const element of document.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
 
   let stopped = false;
   protectionState

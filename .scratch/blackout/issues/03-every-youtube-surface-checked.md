@@ -19,7 +19,7 @@
 
 Implemented. Checked in headless Brave against live YouTube: search results, the Shorts shelf, search suggestions, comments, recommendations, the player end screen, the Shorts player and live chat (in-page and pop-out).
 
-- Snapshots are real logged-out pages, except `fixtures/notifications.html`. It is hand-written because notifications need a signed-in account. Replace it with a saved snapshot when one is available.
+- Snapshots are real pages: logged out for search, watch, Shorts and live chat; `fixtures/notifications.html` is the notifications menu saved from a signed-in session, with images, styles and link parameters stripped.
 - Small items (suggestions, comments, chat, notifications) get a one-row cover; tiles and results keep the card cover.
 - When items nest (a Shorts lockup inside a home-feed tile), only the outer one is checked and covered.
 - The content script now runs in all YouTube frames so it reaches live chat. That includes YouTube embeds on other sites.

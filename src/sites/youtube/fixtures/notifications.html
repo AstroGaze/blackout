@@ -1,25 +1,274 @@
 <!DOCTYPE html>
 <!--
-  Hand-written: notifications need a signed-in account, so this can't be saved
-  from a logged-out session. It follows YouTube's notification menu markup
-  (yt-multi-page-menu-section-renderer > ytd-notification-renderer). Replace it
-  with a saved snapshot when one is available.
+  Saved from a signed-in YouTube session: the notifications menu only, opened
+  from the bell. Images, inline styles, data attributes and link parameters
+  other than the video id were stripped.
 -->
 <html>
   <body>
     <ytd-popup-container>
-      <ytd-multi-page-menu-renderer>
-        <div id="sections">
-          <yt-multi-page-menu-section-renderer>
-            <div id="items">
-              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=trailer3"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">Rockstar Games uploaded: Grand Theft Auto VI Trailer 3</yt-formatted-string><div class="metadata"><yt-formatted-string>2 hours ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
-              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=beast"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">MrBeast uploaded: I Survived 100 Days In A Desert</yt-formatted-string><div class="metadata"><yt-formatted-string>5 hours ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
-              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=lucia"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">Vice City Daily uploaded: Lucia's full story so far</yt-formatted-string><div class="metadata"><yt-formatted-string>1 day ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
-              <ytd-notification-renderer><a class="yt-simple-endpoint" href="/watch?v=bourne"><div id="item"><yt-img-shadow id="avatar"><img alt=""></yt-img-shadow><div class="text"><yt-formatted-string class="message">Movie Recaps uploaded: Jason Bourne in 10 minutes</yt-formatted-string><div class="metadata"><yt-formatted-string>2 days ago</yt-formatted-string></div></div><div id="thumbnail-container"><img alt=""></div></div></a></ytd-notification-renderer>
-            </div>
-          </yt-multi-page-menu-section-renderer>
-        </div>
-      </ytd-multi-page-menu-renderer>
+<ytd-multi-page-menu-renderer slot="dropdown-content" class="style-scope ytd-popup-container" menu-style="multi-page-menu-style-type-notifications" tabindex="-1"><div id="spinner" class="style-scope ytd-multi-page-menu-renderer" hidden="">
+  <tp-yt-paper-spinner class="style-scope ytd-multi-page-menu-renderer" aria-label="loading" aria-hidden="true"><div id="spinnerContainer" class="active cooldown style-scope tp-yt-paper-spinner">
+  <div class="spinner-layer layer-1 style-scope tp-yt-paper-spinner">
+    <div class="circle-clipper left style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+    <div class="circle-clipper right style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+  </div>
+  <div class="spinner-layer layer-2 style-scope tp-yt-paper-spinner">
+    <div class="circle-clipper left style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+    <div class="circle-clipper right style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+  </div>
+  <div class="spinner-layer layer-3 style-scope tp-yt-paper-spinner">
+    <div class="circle-clipper left style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+    <div class="circle-clipper right style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+  </div>
+  <div class="spinner-layer layer-4 style-scope tp-yt-paper-spinner">
+    <div class="circle-clipper left style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+    <div class="circle-clipper right style-scope tp-yt-paper-spinner">
+      <div class="circle style-scope tp-yt-paper-spinner"></div>
+    </div>
+  </div>
+</div>
+</tp-yt-paper-spinner>
+</div>
+<div id="header" class="style-scope ytd-multi-page-menu-renderer"><ytd-simple-menu-header-renderer class="style-scope ytd-multi-page-menu-renderer"><ytd-button-renderer id="back-button" class="style-scope ytd-simple-menu-header-renderer" button-renderer="" button-next="" hidden=""><yt-button-shape></yt-button-shape><tp-yt-paper-tooltip offset="8" disable-upgrade=""> </tp-yt-paper-tooltip></ytd-button-renderer>
+<h2 class="style-scope ytd-simple-menu-header-renderer">
+  <yt-formatted-string class="style-scope ytd-simple-menu-header-renderer">Notificaciones</yt-formatted-string>
+</h2>
+<div id="buttons" class="style-scope ytd-simple-menu-header-renderer"><ytd-button-renderer class="style-scope ytd-simple-menu-header-renderer" button-renderer="" button-next=""><yt-button-shape><a href="/account_notifications" force-new-state="true" aria-label="Configuración" aria-current="false" aria-disabled="false"><div aria-hidden="true" class="ytSpecButtonShapeNextIcon ytSpecButtonShapeNextElevatedContent"><span class="ytIconWrapperHost"><span class="yt-icon-shape ytSpecIconShapeHost"></span></span></div><yt-touch-feedback-shape aria-hidden="true" class="ytSpecTouchFeedbackShapeHost ytSpecTouchFeedbackShapeTouchResponse"><div class="ytSpecTouchFeedbackShapeStroke"></div><div class="ytSpecTouchFeedbackShapeFill"></div></yt-touch-feedback-shape></a></yt-button-shape><tp-yt-paper-tooltip offset="8" role="tooltip" tabindex="-1" aria-label="tooltip"><div id="tooltip" class="hidden style-scope tp-yt-paper-tooltip" style-target="tooltip">
+  Configuración
+</div>
+</tp-yt-paper-tooltip></ytd-button-renderer></div>
+</ytd-simple-menu-header-renderer></div>
+<div id="container" class="menu-container style-scope ytd-multi-page-menu-renderer">
+  <div id="sections" class="style-scope ytd-multi-page-menu-renderer"><yt-multi-page-menu-section-renderer class="style-scope ytd-multi-page-menu-renderer"><div id="section-title" class="style-scope yt-multi-page-menu-section-renderer">
+  <h2 class="style-scope yt-multi-page-menu-section-renderer">
+    <yt-formatted-string class="style-scope yt-multi-page-menu-section-renderer">Importante</yt-formatted-string>
+  </h2>
+</div>
+<div id="items" class="style-scope yt-multi-page-menu-section-renderer"><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=Je-RosK7ZMQ">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition" height="48" width="48" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">No Man's Sky News &amp; Updates: Why the Roses, Sean? 🥀</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 23 horas</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer></div>
+</yt-multi-page-menu-section-renderer><yt-multi-page-menu-section-renderer class="style-scope ytd-multi-page-menu-renderer"><div id="section-title" class="style-scope yt-multi-page-menu-section-renderer">
+  <h2 class="style-scope yt-multi-page-menu-section-renderer">
+    <yt-formatted-string class="style-scope yt-multi-page-menu-section-renderer">Más notificaciones</yt-formatted-string>
+  </h2>
+</div>
+<div id="items" class="style-scope yt-multi-page-menu-section-renderer"><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=HLincBnTp6k">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition" height="48" width="48" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">Returning to No Man's Sky: A New Adventure Begins!</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 1 día</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=_Ii1EhaB9uk">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition" height="48" width="48" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">The Darkest Story in Star Citizen | A Halloween Special</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 3 días</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=k-9qLRKSvK8">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition" height="48" width="48" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">SuicideSheeep</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">DJ Seinfeld - Everything U</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 4 días</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=VoFib5yJPt8">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition" height="48" width="48" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">Star Citizen: Can It Still Make Me Feel Like a New Player? (Not a Tutorial!)</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 8 días</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition" loaded=""><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=r6n7YZrINYY">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition empty" height="48" width="48"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">SuicideSheeep</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">Archangel - From The Ashes</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 11 días</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition empty"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=owG8KG-oUio">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition empty" height="48" width="48"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">SuicideSheeep</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">Ben Böhmer, Nils Hoffmann &amp; Malou - Breathing (orbit Remix)</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 2 semanas</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition empty"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/shorts/dmYJCwAOGE8">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition empty" height="48" width="48"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">My Wife Fought the Yormandi in Star Citizen… It Went Bad #starcitizengameplay #gaming</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 3 semanas</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition empty"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=_1c9jzLKG8s">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition empty" height="48" width="48"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">Star Citizen Yormandi Fight With My Wife | Our Adventure Went Horribly Wrong</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 3 semanas</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition empty"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=AxQ0LKNsApU">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition empty" height="48" width="48"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">Cobra TV (COBRA T.V.)</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">Star Citizen Planet Exploration With My Wife | Yormandi &amp; Hidden Locations</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 3 semanas</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition empty"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer><ytd-notification-renderer class="style-scope yt-multi-page-menu-section-renderer unread"><a class="yt-simple-endpoint style-scope ytd-notification-renderer" tabindex="0" role="link" href="/watch?v=oq6dSK7sRpU">
+  <div id="new" class="style-scope ytd-notification-renderer"></div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+    <yt-img-shadow id="avatar" class="thumbnail style-scope ytd-notification-renderer no-transition empty" height="48" width="48"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" height="48" width="48"></yt-img-shadow>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+  <div class="text style-scope ytd-notification-renderer">
+    <yt-formatted-string class="message style-scope ytd-notification-renderer"><span dir="auto" class="style-scope yt-formatted-string">SuicideSheeep</span><span dir="auto" class="style-scope yt-formatted-string"> subió: </span><span dir="auto" class="style-scope yt-formatted-string">QZB - Surface Tension</span></yt-formatted-string>
+    <div class="metadata style-scope ytd-notification-renderer">
+      <yt-formatted-string class="style-scope ytd-notification-renderer" is-empty=""><yt-attributed-string class="style-scope yt-formatted-string"></yt-attributed-string></yt-formatted-string>
+      <yt-formatted-string class="style-scope ytd-notification-renderer">hace 3 semanas</yt-formatted-string>
+    </div>
+  </div>
+    <div class="thumbnail-container style-scope ytd-notification-renderer style-scope ytd-notification-renderer">
+      <yt-img-shadow width="86" class="style-scope ytd-notification-renderer no-transition empty"><img id="img" draggable="false" class="style-scope yt-img-shadow" alt="" width="86"></yt-img-shadow>
+    </div>
+  <ps-dom-if class="style-scope ytd-notification-renderer"><template is="dom-if"></template></ps-dom-if>
+</a>
+<div id="menu" class="style-scope ytd-notification-renderer"><ytd-menu-renderer class="style-scope ytd-notification-renderer" safe-area="" menu-active=""><div id="top-level-buttons-computed" class="top-level-buttons style-scope ytd-menu-renderer"></div><div id="flexible-item-buttons" class="style-scope ytd-menu-renderer"></div><yt-icon-button id="button" class="dropdown-trigger style-scope ytd-menu-renderer" style-target="button"><button id="button" class="style-scope yt-icon-button" aria-label="Menú de acciones"><yt-icon class="style-scope ytd-menu-renderer"></yt-icon></button><yt-interaction id="interaction" class="circular style-scope yt-icon-button"><div class="stroke style-scope yt-interaction"></div><div class="fill style-scope yt-interaction"></div></yt-interaction></yt-icon-button><yt-button-shape id="button-shape" class="style-scope ytd-menu-renderer" hidden=""></yt-button-shape></ytd-menu-renderer></div>
+</ytd-notification-renderer></div>
+</yt-multi-page-menu-section-renderer></div>
+  <div id="footer" class="style-scope ytd-multi-page-menu-renderer"></div>
+</div>
+<div id="submenu" class="menu-container style-scope ytd-multi-page-menu-renderer" hidden=""></div>
+</ytd-multi-page-menu-renderer>
     </ytd-popup-container>
   </body>
 </html>

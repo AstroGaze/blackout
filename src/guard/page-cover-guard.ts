@@ -41,7 +41,12 @@ export interface PageCoverEvents {
  * Covers a whole page that is about a Protected Topic (a video, a thread) and
  * masks its tab title, re-evaluating when the site navigates to another subject.
  */
-export function guardPageCover(adapter: SiteAdapter, events: PageCoverEvents): PageCoverGuard {
+export function guardPageCover(
+  adapter: SiteAdapter,
+  win: Window,
+  events: PageCoverEvents,
+): PageCoverGuard {
+  const doc = win.document;
   let state: PageState = 'none';
   /** The topic a covered or continued page is about. */
   let topic: PageTopic | null = null;
@@ -70,36 +75,36 @@ export function guardPageCover(adapter: SiteAdapter, events: PageCoverEvents): P
   };
 
   const render = () => {
-    const html = document.documentElement;
+    const html = doc.documentElement;
     if (isMasked()) html.setAttribute(PAGE_STATE_ATTRIBUTE, state);
     else html.removeAttribute(PAGE_STATE_ATTRIBUTE);
-    document.body?.toggleAttribute('inert', isMasked());
+    doc.body?.toggleAttribute('inert', isMasked());
 
     if (state === 'covered' || state === 'unchecked') {
-      mountPageCover({
+      mountPageCover(doc, {
         topicName: state === 'covered' ? topic!.topicName : null,
         onContinue: () => setState('continued', topic),
         onGoBack: () => {
           // A link opened in a new tab has nowhere to go back to.
-          if (history.length > 1) history.back();
-          else location.assign('/');
+          if (win.history.length > 1) win.history.back();
+          else win.location.assign('/');
         },
       });
     } else {
-      unmountPageCover();
+      unmountPageCover(doc);
     }
     syncTitle();
   };
 
   const syncTitle = () => {
     if (isMasked()) {
-      if (document.title !== MASKED_TITLE) {
-        siteTitle = document.title;
-        document.title = MASKED_TITLE;
+      if (doc.title !== MASKED_TITLE) {
+        siteTitle = doc.title;
+        doc.title = MASKED_TITLE;
       }
     } else if (siteTitle !== null) {
       // Restore it, unless the site has set a newer title of its own meanwhile.
-      if (document.title === MASKED_TITLE) document.title = siteTitle;
+      if (doc.title === MASKED_TITLE) doc.title = siteTitle;
       siteTitle = null;
     }
   };
@@ -136,7 +141,7 @@ export function guardPageCover(adapter: SiteAdapter, events: PageCoverEvents): P
 
   const update = (matcher: Matcher | null) => {
     try {
-      const subject = adapter.pageSubject(document);
+      const subject = adapter.pageSubject(doc);
       if (subject === null) {
         if (subjectKey !== null) enterSubject(null);
         if (state !== 'none') setState('none', null);

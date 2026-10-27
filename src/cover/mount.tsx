@@ -94,20 +94,21 @@ export function unmountCover(item: Element): void {
   itemCovers.delete(item);
 }
 
-let pageCover: Mounted | undefined;
+const pageCovers = new WeakMap<Document, Mounted>();
 
 /** Covers the whole page, from outside its body so hiding the body doesn't hide the cover. */
-export function mountPageCover(props: PageCoverProps): void {
-  unmountPageCover();
-  pageCover = mountInShadow(
-    document.documentElement,
+export function mountPageCover(doc: Document, props: PageCoverProps): void {
+  unmountPageCover(doc);
+  const mounted = mountInShadow(
+    doc.documentElement,
     PAGE_COVER_TAG,
     { position: 'fixed', inset: '0', 'z-index': '2147483647' },
     <PageCover {...props} />,
   );
+  pageCovers.set(doc, mounted);
 }
 
-export function unmountPageCover(): void {
-  unmount(pageCover);
-  pageCover = undefined;
+export function unmountPageCover(doc: Document): void {
+  unmount(pageCovers.get(doc));
+  pageCovers.delete(doc);
 }

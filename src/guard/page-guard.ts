@@ -2,6 +2,7 @@ import { COVER_TAG, mountCover, unmountCover } from '@/cover/mount';
 import { compileMatcher, type HideReason, type Matcher } from '@/matcher/matcher';
 import { protectionState } from '@/protection/state';
 import type { CoverLayout, SiteAdapter } from '@/sites/adapter';
+import { inheritPageContext, sharePageContext } from './frame-context';
 import { holdMedia, holdMediaIn, releaseMediaIn } from './media';
 import { guardPageCover, PAGE_STATE_ATTRIBUTE } from './page-cover-guard';
 
@@ -57,7 +58,11 @@ function setState(item: Element, state: ItemState | null) {
  * checked stays hidden. A page that is about a Protected Topic as a whole gets
  * the full-page cover.
  */
-export function startPageGuard(adapter: SiteAdapter): PageGuard {
+export function startPageGuard(
+  adapter: SiteAdapter,
+  win: Window & typeof globalThis = window,
+): PageGuard {
+  const doc = win.document;
   const selectors = adapter.itemKinds.map((kind) => kind.selector);
   const selector = selectors.join(', ');
   const coverLayoutOf = (item: Element): CoverLayout =>
@@ -71,9 +76,9 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     return item;
   };
 
-  const style = document.createElement('style');
+  const style = doc.createElement('style');
   style.textContent = hideFirstCss(selectors);
-  document.documentElement.append(style);
+  doc.documentElement.append(style);
 
   let matcher: Matcher | null = null;
   const awaitingMatcher = new Set<Element>();
@@ -85,7 +90,7 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
 
   /** Checks every item again, as when the page's own topic changes what Weak Terms mean. */
   const recheckAll = () => {
-    for (const element of document.querySelectorAll(selector)) {
+    for (const element of doc.querySelectorAll(selector)) {
       const item = itemOf(element)!;
       if (item !== element) continue;
       checkedText.delete(item);
@@ -99,15 +104,23 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     return item === null || isShown(item);
   };
   const pauseIfHidden = (event: Event) => {
-    if (event.target instanceof HTMLMediaElement && !mayPlay(event.target)) holdMedia(event.target);
+    if (event.target instanceof win.HTMLMediaElement && !mayPlay(event.target)) holdMedia(event.target);
   };
-  document.addEventListener('play', pauseIfHidden, true);
+  doc.addEventListener('play', pauseIfHidden, true);
 
-  const page = guardPageCover(adapter, {
-    onContextChange: recheckAll,
+  // Frames inside this page, such as live chat, count what it's about too.
+  const inherited = inheritPageContext(win, recheckAll);
+  const contextTopicIds = () => new Set([...page.contextTopicIds(), ...inherited.topicIds()]);
+
+  const page = guardPageCover(adapter, win, {
+    onContextChange: () => {
+      recheckAll();
+      sharing.notify();
+    },
     onMaskChange: (masked) =>
-      masked ? holdMediaIn(document) : releaseMediaIn(document, mayPlay),
+      masked ? holdMediaIn(doc) : releaseMediaIn(doc, mayPlay),
   });
+  const sharing = sharePageContext(win, () => page.contextTopicIds());
   page.update(null);
 
   const withhold = (item: Element) => {
@@ -156,7 +169,7 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
       if (text.trim() === '') return withhold(item);
       const key = contentKey(item, text);
       if (revealedKeys.get(item) === key) return show(item, 'revealed');
-      const verdict = matcher.check({ text, contextTopicIds: page.contextTopicIds() });
+      const verdict = matcher.check({ text, contextTopicIds: contextTopicIds() });
       if (verdict.hide) cover(item, verdict.reason, key);
       else show(item, 'clean');
     } catch (error) {
@@ -185,17 +198,17 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     return items;
   };
 
-  const observer = new MutationObserver((records) => {
+  const observer = new win.MutationObserver((records) => {
     page.update(matcher);
     for (const item of itemsAffectedBy(records)) check(item);
   });
-  observer.observe(document.documentElement, {
+  observer.observe(doc.documentElement, {
     childList: true,
     subtree: true,
     characterData: true,
     attributeFilter: adapter.observedAttributes,
   });
-  for (const element of document.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
+  for (const element of doc.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
 
   let stopped = false;
   protectionState
@@ -216,8 +229,10 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     stop() {
       stopped = true;
       observer.disconnect();
-      document.removeEventListener('play', pauseIfHidden, true);
+      doc.removeEventListener('play', pauseIfHidden, true);
       page.stop();
+      sharing.stop();
+      inherited.stop();
       style.remove();
     },
   };

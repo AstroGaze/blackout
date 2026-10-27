@@ -4,11 +4,11 @@
 import { COVER_TAG, PAGE_COVER_TAG } from '@/cover/mount';
 
 /** Replaces the page body and tab title with those of `html`, as if the site rendered it. */
-export function renderPage(html: string): void {
+export function renderPage(html: string, doc: Document = document): void {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  document.title = parsed.title;
-  document.body.replaceChildren(
-    ...Array.from(parsed.body.childNodes, (node) => document.importNode(node, true)),
+  doc.title = parsed.title;
+  doc.body.replaceChildren(
+    ...Array.from(parsed.body.childNodes, (node) => doc.importNode(node, true)),
   );
 }
 
@@ -36,7 +36,8 @@ export function viewItem(item: Element, titleOf: TitleOf = wholeText): ItemView 
   const title = titleOf(item);
   const label = coverLabel(item);
   if (label !== null) return { title, state: 'covered', reason: label };
-  if (getComputedStyle(item).visibility === 'hidden') return { title, state: 'withheld' };
+  const view = item.ownerDocument.defaultView ?? window;
+  if (view.getComputedStyle(item).visibility === 'hidden') return { title, state: 'withheld' };
   return { title, state: 'shown' };
 }
 

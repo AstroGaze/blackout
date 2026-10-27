@@ -6,6 +6,12 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     // Page-seam tests open pages at site addresses, as the content scripts see them.
-    environmentOptions: { happyDOM: { url: 'https://www.youtube.com/' } },
+    environmentOptions: {
+      happyDOM: {
+        url: 'https://www.youtube.com/',
+        // Live chat runs in a frame inside the watch page.
+        settings: { enableIframePageLoading: true },
+      },
+    },
   },
 });

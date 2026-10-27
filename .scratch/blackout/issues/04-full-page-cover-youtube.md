@@ -26,5 +26,6 @@ Notes:
 - **Videos.** Nothing hidden or covered may play, which includes covered Shorts (ticket 03's sound gap). Videos Blackout paused play again once their page or item is shown.
 - **Description.** The watch page's own description is now checked as an item.
 - **Go back.** It falls back to the YouTube home page when there's no history, such as a link opened in a new tab.
-- **Open: chat context.** Live chat runs in its own frame, which doesn't know what the watch page is about. A chat message with only a Weak Term ("Jason") still shows on a page about GTA 6.
+- **Chat context.** Live chat in a watch page counts what the page is about. Blackout in each frame shares its page topic on its window in the extension's isolated world, where Blackout in same-origin child frames can read it but YouTube's scripts can't. Verified on a live GTA 6 stream: a chat message with only "Jason" is covered.
+- **Open: pop-out chat.** It has no parent page to inherit from, so Weak Terms alone still show there.
 - **Open: title flash.** YouTube can set the real tab title a moment before Blackout masks it again in the same microtask checkpoint. A main-world observer saw it, but the sampled checks never did. The tab strip might flash it.

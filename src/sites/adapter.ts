@@ -7,6 +7,11 @@ export type { CoverLayout };
 export interface ItemKind {
   selector: string;
   cover: CoverLayout;
+  /**
+   * Shows another item's content elsewhere on the page, like a hover preview.
+   * It stays hidden while that item is, matched by item key.
+   */
+  mirrors?: boolean;
 }
 
 /** What a page guard needs to know about one site. Adapters contain no matching logic. */

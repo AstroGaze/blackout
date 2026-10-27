@@ -65,8 +65,9 @@ export function startPageGuard(
   const doc = win.document;
   const selectors = adapter.itemKinds.map((kind) => kind.selector);
   const selector = selectors.join(', ');
-  const coverLayoutOf = (item: Element): CoverLayout =>
-    adapter.itemKinds.find((kind) => item.matches(kind.selector))?.cover ?? 'card';
+  const kindOf = (item: Element) => adapter.itemKinds.find((kind) => item.matches(kind.selector));
+  const coverLayoutOf = (item: Element): CoverLayout => kindOf(item)?.cover ?? 'card';
+  const isMirror = (item: Element) => kindOf(item)?.mirrors === true;
   /** The item an element belongs to: the outermost one, when items nest. */
   const itemOf = (element: Element): Element | null => {
     let item = element.closest(selector);
@@ -86,7 +87,37 @@ export function startPageGuard(
   const checkedText = new WeakMap<Element, string>();
   /** Items revealed during this page view, with the content key they had then. */
   const revealedKeys = new WeakMap<Element, string>();
+  /** Why each covered item is covered, so a mirror of it can say the same. */
+  const coverReasons = new WeakMap<Element, HideReason>();
   const contentKey = (item: Element, text: string) => adapter.itemKey(item) ?? text;
+
+  /**
+   * Keeps a mirror (a hover preview) as hidden as the item it shows, and lets it
+   * show what the user revealed. Returns false when its own check should decide.
+   */
+  const checkMirror = (mirror: Element, key: string): boolean => {
+    const sources = Array.from(doc.querySelectorAll(selector)).filter(
+      (item) => item !== mirror && !isMirror(item) && itemOf(item) === item && adapter.itemKey(item) === key,
+    );
+    if (sources.some((source) => source.getAttribute(STATE_ATTRIBUTE) === 'revealed')) {
+      show(mirror, 'revealed');
+      return true;
+    }
+    const hidden = sources.find((source) => !isShown(source));
+    if (!hidden) return false;
+    const reason = coverReasons.get(hidden);
+    if (reason && hidden.getAttribute(STATE_ATTRIBUTE) === 'covered') cover(mirror, reason, key);
+    else withhold(mirror);
+    return true;
+  };
+  const recheckMirrors = () => {
+    for (const kind of adapter.itemKinds.filter((candidate) => candidate.mirrors)) {
+      for (const mirror of doc.querySelectorAll(kind.selector)) {
+        checkedText.delete(mirror);
+        check(mirror);
+      }
+    }
+  };
 
   /** Checks every item again, as when the page's own topic changes what Weak Terms mean. */
   const recheckAll = () => {
@@ -137,6 +168,7 @@ export function startPageGuard(
 
   const cover = (item: Element, reason: HideReason, key: string) => {
     setState(item, 'covered');
+    coverReasons.set(item, reason);
     holdMediaIn(item);
     mountCover(item, {
       layout: coverLayoutOf(item),
@@ -144,6 +176,7 @@ export function startPageGuard(
       onReveal: () => {
         revealedKeys.set(item, key);
         show(item, 'revealed');
+        recheckMirrors();
       },
     });
   };
@@ -169,6 +202,7 @@ export function startPageGuard(
       if (text.trim() === '') return withhold(item);
       const key = contentKey(item, text);
       if (revealedKeys.get(item) === key) return show(item, 'revealed');
+      if (isMirror(item) && checkMirror(item, key)) return;
       const verdict = matcher.check({ text, contextTopicIds: contextTopicIds() });
       if (verdict.hide) cover(item, verdict.reason, key);
       else show(item, 'clean');

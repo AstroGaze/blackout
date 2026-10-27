@@ -34,6 +34,8 @@ export const youtube: SiteAdapter = {
     inline('ytd-notification-renderer'),
     // A watch page's own description.
     inline('#description-inner'),
+    // The player YouTube lays over a tile or Short while hovering it.
+    { selector: 'ytd-video-preview', cover: 'card', mirrors: true },
   ],
   // YouTube marks the watch page metadata with its video once it has loaded.
   observedAttributes: ['video-id'],

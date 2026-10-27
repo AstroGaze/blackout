@@ -19,6 +19,19 @@ const { documentCss, shadowCss } = splitShadowRootCss(remToPx(coverCss));
 export const COVER_TAG = 'blackout-cover';
 export const PAGE_COVER_TAG = 'blackout-page-cover';
 
+const PRESS_EVENTS = [
+  'pointerdown',
+  'pointerup',
+  'mousedown',
+  'mouseup',
+  'touchstart',
+  'touchend',
+  'click',
+  'auxclick',
+  'dblclick',
+  'contextmenu',
+] as const;
+
 interface Mounted {
   host: HTMLElement;
   root: Root;
@@ -49,12 +62,14 @@ function mountInShadow(
   for (const [property, value] of Object.entries({ display: 'block', ...hostStyles })) {
     host.style.setProperty(property, value, 'important');
   }
-  // Keep clicks on the cover from reaching the site's own handlers, or following
-  // the link when the covered item is a link itself.
-  host.addEventListener('click', (event) => {
-    event.stopPropagation();
-    event.preventDefault();
-  });
+  // Keep presses and clicks on the cover from reaching the site's own handlers:
+  // some act on press, like search suggestions. A click mustn't follow the link
+  // when the covered item is a link itself.
+  for (const type of PRESS_EVENTS) host.addEventListener(type, (event) => event.stopPropagation());
+  host.addEventListener('click', (event) => event.preventDefault());
+  // Pressing the cover mustn't move focus either: taking it from the search box
+  // would close the suggestions before Reveal can be clicked.
+  host.addEventListener('mousedown', (event) => event.preventDefault());
 
   const shadow = host.attachShadow({ mode: 'open' });
   const style = doc.createElement('style');

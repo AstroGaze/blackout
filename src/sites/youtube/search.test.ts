@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { startPageGuard, type PageGuard } from '@/guard/page-guard';
-import { renderPage, settle } from '@/test/page';
+import { clickCoverButton, renderPage, settle } from '@/test/page';
 import { youtube } from './adapter';
 import search from './fixtures/search.html?raw';
 import { coveredTitles, viewItem, viewItems } from './fixtures/view';
@@ -17,6 +17,38 @@ beforeEach(async () => {
 });
 
 afterEach(() => guard?.stop());
+
+const SHORT = 'ytm-shorts-lockup-view-model';
+
+const shortsBy = (state: 'covered' | 'shown') =>
+  Array.from(document.querySelectorAll(SHORT)).filter((short) => viewItem(short).state === state);
+
+/**
+ * Fills YouTube's shared preview player the way hovering a Short does: with that
+ * Short's link, a title and a playing video, laid over the Short.
+ */
+async function hoverPreview(short: Element, title: string): Promise<Element> {
+  const href = short.querySelector('a[href*="/shorts/"]')!.getAttribute('href')!;
+  const preview = document.querySelector('ytd-video-preview')!;
+  const link = document.createElement('a');
+  link.className = 'ytdVideoPreviewMediaContainerLink';
+  link.setAttribute('href', href);
+  link.append(document.createElement('video'));
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  preview.replaceChildren(link, heading);
+  await settle();
+  return preview;
+}
+
+/** The button inside an item's cover whose text is `name`. */
+function coverButton(item: Element, name: string): HTMLButtonElement {
+  const button = Array.from(
+    item.querySelector('blackout-cover')?.shadowRoot?.querySelectorAll('button') ?? [],
+  ).find((candidate) => candidate.textContent?.trim() === name);
+  if (!button) throw new Error(`No "${name}" button on the cover`);
+  return button;
+}
 
 describe('YouTube search for "gta" with the ready-made GTA 6 topic', () => {
   it('covers the results about GTA 6 and shows the rest', () => {
@@ -68,6 +100,62 @@ describe('YouTube search for "gta" with the ready-made GTA 6 topic', () => {
       'shown: gta san andreas',
       'covered: gta 6 reaction',
     ]);
+  });
+
+  describe("YouTube's hover preview over a Short", () => {
+    it('covers the preview of a covered Short, and keeps its video from playing', async () => {
+      const short = shortsBy('covered')[0]!;
+
+      const preview = await hoverPreview(short, 'Watch the new clip');
+      const video = preview.querySelector('video')!;
+      await video.play();
+
+      expect(viewItem(preview)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+      expect(video.paused).toBe(true);
+    });
+
+    it('shows the preview of a Short that is shown', async () => {
+      const short = shortsBy('shown')[0]!;
+
+      const preview = await hoverPreview(short, viewItem(short).title);
+
+      expect(viewItem(preview)).toMatchObject({ state: 'shown' });
+    });
+
+    it('shows the preview of a Short the user revealed', async () => {
+      const short = shortsBy('covered')[0]!;
+      clickCoverButton(short, 'Reveal');
+      await settle();
+      clickCoverButton(short, 'Show');
+      await settle();
+
+      const preview = await hoverPreview(short, 'Watch the new clip');
+
+      expect(viewItem(preview)).toMatchObject({ state: 'shown' });
+    });
+  });
+
+  it("keeps presses and clicks on a covered suggestion's cover from reaching YouTube", async () => {
+    const suggestion = Array.from(document.querySelectorAll('.ytSuggestionComponentSuggestion')).find(
+      (item) => viewItem(item).state === 'covered',
+    )!;
+    const reachedYouTube: string[] = [];
+    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+      suggestion.addEventListener(type, () => reachedYouTube.push(type));
+    }
+
+    const reveal = coverButton(suggestion, 'Reveal');
+    const presses = ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].map(
+      (type) => new MouseEvent(type, { bubbles: true, composed: true, cancelable: true }),
+    );
+    for (const press of presses) reveal.dispatchEvent(press);
+    reveal.click();
+    await settle();
+
+    expect(reachedYouTube).toEqual([]);
+    // Pressing doesn't move focus off the search box, which would close the suggestions.
+    expect(presses.find((press) => press.type === 'mousedown')!.defaultPrevented).toBe(true);
+    expect(() => coverButton(suggestion, 'Show')).not.toThrow();
   });
 
   it('covers the Shorts in the results shelf that are about GTA 6', () => {

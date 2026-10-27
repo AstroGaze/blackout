@@ -25,6 +25,14 @@ describe('YouTube Shorts player with the ready-made GTA 6 topic', () => {
     expect(viewItem(player())).toMatchObject({ state: 'covered', reason: 'GTA 6' });
   });
 
+  it("doesn't let a covered Short play, so it can't spoil by sound", async () => {
+    const video = player().querySelector('video')!;
+
+    await video.play();
+
+    expect(video.paused).toBe(true);
+  });
+
   it('shows the next Short when it is not about GTA 6', async () => {
     // Scrolling to the next Short reuses the player for another video.
     // Its title shows twice: under the video and in the player's title bar.

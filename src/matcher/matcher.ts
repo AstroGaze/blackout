@@ -10,6 +10,8 @@ export type Verdict = { hide: false } | { hide: true; reason: HideReason };
 
 export interface CheckableItem {
   text: string;
+  /** Topics the item's surroundings are about, such as the page it sits on. */
+  contextTopicIds?: ReadonlySet<string>;
 }
 
 export interface Matcher {
@@ -113,8 +115,14 @@ export function compileMatcher(state: ProtectionState): Matcher {
       });
       for (const topic of activeTopics) {
         const matched = matchedTermsByTopic.get(topic);
-        // A Strong Term hides on its own; a Weak Term needs another term of its topic.
-        if (matched && (matched.size > 1 || [...matched].some((term) => term.strong))) {
+        if (!matched) continue;
+        // A Strong Term hides on its own. A Weak Term needs another term of its
+        // topic, or surroundings that are about the topic.
+        if (
+          matched.size > 1 ||
+          [...matched].some((term) => term.strong) ||
+          item.contextTopicIds?.has(topic.id)
+        ) {
           return { hide: true, reason: { kind: 'topic', topicId: topic.id, topicName: topic.name } };
         }
       }

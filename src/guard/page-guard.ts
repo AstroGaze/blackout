@@ -2,6 +2,8 @@ import { COVER_TAG, mountCover, unmountCover } from '@/cover/mount';
 import { compileMatcher, type HideReason, type Matcher } from '@/matcher/matcher';
 import { protectionState } from '@/protection/state';
 import type { CoverLayout, SiteAdapter } from '@/sites/adapter';
+import { holdMedia, holdMediaIn, releaseMediaIn } from './media';
+import { guardPageCover, PAGE_STATE_ATTRIBUTE } from './page-cover-guard';
 
 export interface PageGuard {
   stop(): void;
@@ -26,7 +28,8 @@ ${each(`${covered} > :not(${COVER_TAG})`)} {
   filter: blur(24px) !important;
   pointer-events: none !important;
   user-select: none !important;
-}`;
+}
+html[${PAGE_STATE_ATTRIBUTE}] body { visibility: hidden !important; }`;
 }
 
 /** Keeps focus and screen readers out of a covered item's own content. */
@@ -35,6 +38,11 @@ function setContentInert(item: Element, inert: boolean) {
     if (child.localName === COVER_TAG) continue;
     child.toggleAttribute('inert', inert);
   }
+}
+
+function isShown(item: Element) {
+  const state = item.getAttribute(STATE_ATTRIBUTE);
+  return state === 'clean' || state === 'revealed';
 }
 
 function setState(item: Element, state: ItemState | null) {
@@ -46,7 +54,8 @@ function setState(item: Element, state: ItemState | null) {
 /**
  * Hides every item the adapter declares from first paint, checks each one as it
  * arrives or changes, and only shows items that pass. Anything that can't be
- * checked stays hidden.
+ * checked stays hidden. A page that is about a Protected Topic as a whole gets
+ * the full-page cover.
  */
 export function startPageGuard(adapter: SiteAdapter): PageGuard {
   const selectors = adapter.itemKinds.map((kind) => kind.selector);
@@ -74,6 +83,33 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
   const revealedKeys = new WeakMap<Element, string>();
   const contentKey = (item: Element, text: string) => adapter.itemKey(item) ?? text;
 
+  /** Checks every item again, as when the page's own topic changes what Weak Terms mean. */
+  const recheckAll = () => {
+    for (const element of document.querySelectorAll(selector)) {
+      const item = itemOf(element)!;
+      if (item !== element) continue;
+      checkedText.delete(item);
+      check(item);
+    }
+  };
+  /** Nothing hidden or covered may play, so a video can't spoil by sound. */
+  const mayPlay = (media: HTMLMediaElement) => {
+    if (page.isMasked()) return false;
+    const item = itemOf(media);
+    return item === null || isShown(item);
+  };
+  const pauseIfHidden = (event: Event) => {
+    if (event.target instanceof HTMLMediaElement && !mayPlay(event.target)) holdMedia(event.target);
+  };
+  document.addEventListener('play', pauseIfHidden, true);
+
+  const page = guardPageCover(adapter, {
+    onContextChange: recheckAll,
+    onMaskChange: (masked) =>
+      masked ? holdMediaIn(document) : releaseMediaIn(document, mayPlay),
+  });
+  page.update(null);
+
   const withhold = (item: Element) => {
     checkedText.delete(item);
     unmountCover(item);
@@ -83,10 +119,12 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
   const show = (item: Element, state: 'clean' | 'revealed') => {
     unmountCover(item);
     setState(item, state);
+    releaseMediaIn(item, mayPlay);
   };
 
   const cover = (item: Element, reason: HideReason, key: string) => {
     setState(item, 'covered');
+    holdMediaIn(item);
     mountCover(item, {
       layout: coverLayoutOf(item),
       topicName: reason.topicName,
@@ -118,7 +156,7 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
       if (text.trim() === '') return withhold(item);
       const key = contentKey(item, text);
       if (revealedKeys.get(item) === key) return show(item, 'revealed');
-      const verdict = matcher.check({ text });
+      const verdict = matcher.check({ text, contextTopicIds: page.contextTopicIds() });
       if (verdict.hide) cover(item, verdict.reason, key);
       else show(item, 'clean');
     } catch (error) {
@@ -148,12 +186,14 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
   };
 
   const observer = new MutationObserver((records) => {
+    page.update(matcher);
     for (const item of itemsAffectedBy(records)) check(item);
   });
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
     characterData: true,
+    attributeFilter: adapter.observedAttributes,
   });
   for (const element of document.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
 
@@ -163,6 +203,7 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     .then((state) => {
       if (stopped) return;
       matcher = compileMatcher(state);
+      page.update(matcher);
       for (const item of awaitingMatcher) if (item.isConnected) check(item);
       awaitingMatcher.clear();
     })
@@ -175,6 +216,8 @@ export function startPageGuard(adapter: SiteAdapter): PageGuard {
     stop() {
       stopped = true;
       observer.disconnect();
+      document.removeEventListener('play', pauseIfHidden, true);
+      page.stop();
       style.remove();
     },
   };

@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { splitShadowRootCss } from 'wxt/utils/split-shadow-root-css';
 import { Cover, type CoverProps } from './cover';
 import coverCss from './cover.css?inline';
+import { PageCover, type PageCoverProps } from './page-cover';
 
 /**
  * Sites like YouTube shrink the root font size, so rem units would shrink the
@@ -15,7 +17,12 @@ const remToPx = (css: string) =>
 const { documentCss, shadowCss } = splitShadowRootCss(remToPx(coverCss));
 
 export const COVER_TAG = 'blackout-cover';
-const roots = new WeakMap<Element, { host: HTMLElement; root: Root }>();
+export const PAGE_COVER_TAG = 'blackout-page-cover';
+
+interface Mounted {
+  host: HTMLElement;
+  root: Root;
+}
 
 function ensureDocumentCss(doc: Document) {
   if (doc.querySelector('style[data-blackout-document-css]')) return;
@@ -25,19 +32,21 @@ function ensureDocumentCss(doc: Document) {
   (doc.head ?? doc.documentElement).append(style);
 }
 
-/** Places a cover over `item`, inside a Shadow DOM so site styles can't reach it. */
-export function mountCover(item: Element, props: CoverProps): void {
-  unmountCover(item);
-  const doc = item.ownerDocument;
+/**
+ * Renders `ui` into a new host element inside a Shadow DOM, so site styles
+ * can't reach it, and appends the host to `parent`.
+ */
+function mountInShadow(
+  parent: Element,
+  tag: string,
+  hostStyles: Record<string, string>,
+  ui: ReactNode,
+): Mounted {
+  const doc = parent.ownerDocument;
   ensureDocumentCss(doc);
 
-  const host = doc.createElement(COVER_TAG);
-  for (const [property, value] of [
-    ['display', 'block'],
-    ['position', 'absolute'],
-    ['inset', '0'],
-    ['z-index', '10'],
-  ] as const) {
+  const host = doc.createElement(tag);
+  for (const [property, value] of Object.entries({ display: 'block', ...hostStyles })) {
     host.style.setProperty(property, value, 'important');
   }
   // Keep clicks on the cover from reaching the site's own handlers, or following
@@ -53,18 +62,52 @@ export function mountCover(item: Element, props: CoverProps): void {
   const container = doc.createElement('div');
   container.style.height = '100%';
   shadow.append(style, container);
-  item.append(host);
+  parent.append(host);
 
   const root = createRoot(container);
-  // Render synchronously so the label is in place before the next paint.
-  flushSync(() => root.render(<Cover {...props} />));
-  roots.set(item, { host, root });
+  // Render synchronously so the cover is in place before the next paint.
+  flushSync(() => root.render(ui));
+  return { host, root };
+}
+
+function unmount(mounted: Mounted | undefined) {
+  mounted?.root.unmount();
+  mounted?.host.remove();
+}
+
+const itemCovers = new WeakMap<Element, Mounted>();
+
+/** Places a cover over `item`. */
+export function mountCover(item: Element, props: CoverProps): void {
+  unmountCover(item);
+  const mounted = mountInShadow(
+    item,
+    COVER_TAG,
+    { position: 'absolute', inset: '0', 'z-index': '10' },
+    <Cover {...props} />,
+  );
+  itemCovers.set(item, mounted);
 }
 
 export function unmountCover(item: Element): void {
-  const mounted = roots.get(item);
-  if (!mounted) return;
-  roots.delete(item);
-  mounted.root.unmount();
-  mounted.host.remove();
+  unmount(itemCovers.get(item));
+  itemCovers.delete(item);
+}
+
+let pageCover: Mounted | undefined;
+
+/** Covers the whole page, from outside its body so hiding the body doesn't hide the cover. */
+export function mountPageCover(props: PageCoverProps): void {
+  unmountPageCover();
+  pageCover = mountInShadow(
+    document.documentElement,
+    PAGE_COVER_TAG,
+    { position: 'fixed', inset: '0', 'z-index': '2147483647' },
+    <PageCover {...props} />,
+  );
+}
+
+export function unmountPageCover(): void {
+  unmount(pageCover);
+  pageCover = undefined;
 }

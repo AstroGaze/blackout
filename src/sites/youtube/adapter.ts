@@ -32,7 +32,11 @@ export const youtube: SiteAdapter = {
     // Pinned messages.
     inline('yt-live-chat-banner-renderer'),
     inline('ytd-notification-renderer'),
+    // A watch page's own description.
+    inline('#description-inner'),
   ],
+  // YouTube marks the watch page metadata with its video once it has loaded.
+  observedAttributes: ['video-id'],
   itemText: readText,
   itemKey(item) {
     // Links may be relative or absolute, and an item can be a link itself.
@@ -47,5 +51,19 @@ export const youtube: SiteAdapter = {
     // A comment links to its video with its own id in "lc".
     const comment = url.searchParams.get('lc');
     return `watch:${url.searchParams.get('v')}${comment ? `:${comment}` : ''}`;
+  },
+  pageSubject(doc) {
+    const url = new URL(doc.location.href);
+    const videoId = url.searchParams.get('v');
+    if (url.pathname !== '/watch' || !videoId || !/^[\w-]+$/.test(videoId)) return null;
+    const key = `watch:${videoId}`;
+    // After navigating inside YouTube, the metadata shows the previous video until
+    // it updates, so only trust metadata marked with this video's id.
+    const metadata = doc.querySelector(`ytd-watch-metadata[video-id="${videoId}"]`);
+    const title = metadata?.querySelector('#title h1');
+    const titleText = title ? readText(title).trim() : '';
+    if (!metadata || titleText === '') return { key, text: null };
+    const channel = metadata.querySelector('#owner ytd-channel-name');
+    return { key, text: `${titleText} ${channel ? readText(channel) : ''}` };
   },
 };

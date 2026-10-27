@@ -25,6 +25,20 @@ export interface SiteAdapter {
    * Null when the item has no identity of its own; its text is used instead.
    */
   itemKey(item: Element): string | null;
+  /**
+   * What the page as a whole is about, such as the video on a watch page, or
+   * null when it isn't about one thing (a feed, search results).
+   */
+  pageSubject(doc: Document): PageSubject | null;
+  /** Attributes whose changes can change an item or the page subject. */
+  observedAttributes: string[];
+}
+
+export interface PageSubject {
+  /** Identifies the page's subject, so navigating to another one is noticed. */
+  key: string;
+  /** The text to check, or null while the site hasn't rendered it yet. */
+  text: string | null;
 }
 
 /**

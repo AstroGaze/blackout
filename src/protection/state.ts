@@ -42,9 +42,17 @@ export interface ProtectedTopic {
   terms: RelatedTerm[];
 }
 
-export interface BlockedSource {
+/** One account on one site, as the site identifies it. */
+export interface SourceId {
   site: Site;
+  /** The account, such as a YouTube handle in lowercase ("@rockstargames") or a channel id. */
   account: string;
+}
+
+/** One account on one site whose content is always hidden. */
+export interface BlockedSource extends SourceId {
+  /** How the site shows the account, such as "Rockstar Games". */
+  name: string;
 }
 
 export interface ModelConnection {

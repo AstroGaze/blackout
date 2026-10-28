@@ -8,7 +8,7 @@ export default defineConfig({
   manifest: {
     name: 'Blackout',
     description: "Hides spoilers for the media you haven't finished yet.",
-    permissions: ['storage', 'alarms'],
+    permissions: ['storage', 'alarms', 'contextMenus'],
     // Background material for building Related Terms (spec: Permissions).
     host_permissions: ['https://*.wikipedia.org/*', 'https://*.fandom.com/*'],
     // The AI model's server, asked for when the user connects it (spec: Permissions).

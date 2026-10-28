@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
+import { BlockedSourcesSettings } from '@/components/blocked-sources-settings';
 import { LanguageSettings } from '@/components/language-settings';
 import { Logo } from '@/components/logo';
 import { ModelSettings } from '@/components/model-settings';
@@ -39,6 +40,7 @@ import {
 /** The settings sections, by the address hash that opens each. */
 const SECTIONS = [
   { hash: '', label: 'Protected Topics' },
+  { hash: '#blocked', label: 'Blocked Sources' },
   { hash: '#model', label: 'AI model' },
   { hash: '#languages', label: 'Languages' },
 ] as const;
@@ -100,6 +102,8 @@ export function App() {
       <main className="flex max-w-[920px] min-w-0 flex-[999_1_560px] flex-col gap-6 px-6 py-8">
         {hash === '#model' ? (
           <ModelSettings connection={state.modelConnection} />
+        ) : hash === '#blocked' ? (
+          <BlockedSourcesSettings sources={state.blockedSources} />
         ) : hash === '#languages' ? (
           <LanguageSettings languages={state.browsingLanguages} />
         ) : selected === null ? (

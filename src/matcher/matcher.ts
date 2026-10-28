@@ -1,10 +1,9 @@
-import { isTopicActive, type ProtectedTopic, type ProtectionState } from '@/protection/state';
+import { isTopicActive, type BlockedSource, type ProtectedTopic, type ProtectionState, type SourceId } from '@/protection/state';
 
-export interface HideReason {
-  kind: 'topic';
-  topicId: string;
-  topicName: string;
-}
+/** Why an item is hidden: it is about a Protected Topic, or it comes from a Blocked Source. */
+export type HideReason =
+  | { kind: 'topic'; topicId: string; topicName: string }
+  | { kind: 'blockedSource'; source: BlockedSource };
 
 export type Verdict = { hide: false } | { hide: true; reason: HideReason };
 
@@ -12,6 +11,8 @@ export interface CheckableItem {
   text: string;
   /** Topics the item's surroundings are about, such as the page it sits on. */
   contextTopicIds?: ReadonlySet<string>;
+  /** The account that posted the item, when the site shows it. */
+  source?: SourceId | null;
 }
 
 export interface Matcher {
@@ -100,8 +101,17 @@ export function compileMatcher(state: ProtectionState, now = Date.now()): Matche
     }
   }
 
+  /** Blocked Sources by site and account. They apply while any topic is active. */
+  const blockedSources = new Map<string, BlockedSource>();
+  for (const source of state.blockedSources) {
+    if (typeof source.site !== 'string' || typeof source.account !== 'string') throw new Error('Malformed Blocked Source');
+    blockedSources.set(`${source.site} ${source.account}`, source);
+  }
+
   return {
     check(item) {
+      const blocked = item.source && activeTopics.length > 0 && blockedSources.get(`${item.source.site} ${item.source.account}`);
+      if (blocked) return { hide: true, reason: { kind: 'blockedSource', source: blocked } };
       // Look for every term at every word, so overlapping terms of different topics all count.
       const words = normalize(item.text).split(' ');
       const matchedTermsByTopic = new Map<ProtectedTopic, Set<CompiledTerm>>();

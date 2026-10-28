@@ -1,9 +1,12 @@
+import { coverReason } from '@/cover/cover';
 import { COVER_TAG, mountCover, unmountCover } from '@/cover/mount';
 import { compileMatcher, type HideReason, type Matcher } from '@/matcher/matcher';
-import { nextPauseEnd, protectionState, type ProtectionState } from '@/protection/state';
+import { requestBlock, requestUnblock } from '@/protection/blocked-sources';
+import { nextPauseEnd, protectionState, type BlockedSource, type ProtectionState } from '@/protection/state';
 import type { CoverLayout, SiteAdapter } from '@/sites/adapter';
 import { inheritPageContext, sharePageContext } from './frame-context';
 import { holdMedia, holdMediaIn, releaseMediaIn } from './media';
+import { answerSourceUnderPointer } from './source-under-pointer';
 import { guardPageCover, PAGE_STATE_ATTRIBUTE } from './page-cover-guard';
 
 export interface PageGuard {
@@ -90,6 +93,17 @@ export function startPageGuard(
   /** Why each covered item is covered, so a mirror of it can say the same. */
   const coverReasons = new WeakMap<Element, HideReason>();
   const contentKey = (item: Element, text: string) => adapter.itemKey(item) ?? text;
+  /**
+   * The account that posted an item, or null when the site doesn't show it or it
+   * can't be read. For offering to block it; a check reads it itself and fails closed.
+   */
+  const sourceOf = (item: Element): BlockedSource | null => {
+    try {
+      return adapter.itemSource(item);
+    } catch {
+      return null;
+    }
+  };
 
   /**
    * Keeps a mirror (a hover preview) as hidden as the item it shows, and lets it
@@ -181,14 +195,17 @@ export function startPageGuard(
     coverReasons.set(item, reason);
     holdMediaIn(item);
     coveredItems.add(item);
+    const source = reason.kind === 'topic' ? sourceOf(item) : null;
     mountCover(item, {
       layout: coverLayoutOf(item),
-      topicName: reason.topicName,
+      reason: coverReason(reason),
       onReveal: () => {
         revealedKeys.set(item, key);
         show(item, 'revealed');
         recheckMirrors();
       },
+      onBlockSource: source ? () => void requestBlock(source) : undefined,
+      onUnblock: reason.kind === 'blockedSource' ? () => void requestUnblock(reason.source) : undefined,
     });
   };
 
@@ -214,7 +231,7 @@ export function startPageGuard(
       const key = contentKey(item, text);
       if (revealedKeys.get(item) === key) return show(item, 'revealed');
       if (isMirror(item) && checkMirror(item, key)) return;
-      const verdict = matcher.check({ text, contextTopicIds: contextTopicIds() });
+      const verdict = matcher.check({ text, contextTopicIds: contextTopicIds(), source: adapter.itemSource(item) });
       if (verdict.hide) cover(item, verdict.reason, key);
       else show(item, 'clean');
     } catch (error) {
@@ -254,6 +271,15 @@ export function startPageGuard(
     attributeFilter: adapter.observedAttributes,
   });
   for (const element of doc.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
+
+  // "Block this channel" in the right-click menu blocks the item under the pointer,
+  // or the channel a right-clicked link points to, such as a video's channel name.
+  const stopAnsweringSource = answerSourceUnderPointer(win, (target) => {
+    const item = itemOf(target);
+    if (item) return sourceOf(item);
+    const link = target.closest('a[href]');
+    return link ? sourceOf(link) : null;
+  });
 
   const stopProtectingInteractions = adapter.protectInteractions?.({
     win,
@@ -322,6 +348,7 @@ export function startPageGuard(
       observer.disconnect();
       doc.removeEventListener('play', pauseIfHidden, true);
       stopProtectingInteractions?.();
+      stopAnsweringSource();
       for (const item of coveredItems) removeCover(item);
       page.stop();
       sharing.stop();

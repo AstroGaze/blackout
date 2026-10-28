@@ -1,5 +1,8 @@
 import { mountPageCover, unmountPageCover } from '@/cover/mount';
 import type { HideReason, Matcher } from '@/matcher/matcher';
+import { coverReason } from '@/cover/cover';
+import { requestBlock, requestUnblock } from '@/protection/blocked-sources';
+import type { BlockedSource } from '@/protection/state';
 import type { SiteAdapter } from '@/sites/adapter';
 
 /** Set on <html> while the page is masked; the hide-first stylesheet hides the body. */
@@ -10,13 +13,12 @@ export const UNCHECKED_AFTER_MS = 8000;
 
 /**
  * - pending: the page is about one thing, but the site hasn't shown what yet.
- * - covered: it's about a Protected Topic.
+ * - covered: it's about a Protected Topic, or comes from a Blocked Source.
  * - unchecked: it stayed pending too long, or its check failed.
  * - continued: the user chose to see a covered or unchecked page.
  * - clean: it passed the check.
  */
 type PageState = 'none' | 'pending' | 'covered' | 'unchecked' | 'continued' | 'clean';
-type PageTopic = Pick<HideReason, 'topicId' | 'topicName'>;
 
 const MASKED_STATES: ReadonlySet<PageState> = new Set(['pending', 'covered', 'unchecked']);
 
@@ -52,12 +54,15 @@ export function guardPageCover(
 ): PageCoverGuard {
   const doc = win.document;
   let state: PageState = 'none';
-  /** The topic a covered or continued page is about. */
-  let topic: PageTopic | null = null;
+  /** Why a covered or continued page is hidden: its topic, or its Blocked Source. */
+  let reason: HideReason | null = null;
   let subjectKey: string | null = null;
-  /** The newest text the current subject has shown, and the text last checked. */
+  /** The newest text the current subject has shown. */
   let subjectText: string | null = null;
-  let checkedText: string | null = null;
+  /** The account that posted the current subject, when the site shows it. */
+  let subjectSource: BlockedSource | null = null;
+  /** The text and account last checked, as `checkKey` gives them. */
+  let checkedKey: string | null = null;
   /** The previous subject's text, which the site may still show under the new key. */
   let staleText: string | null = null;
   /** The site's own tab title for the current subject, kept while it is masked. */
@@ -68,13 +73,13 @@ export function guardPageCover(
 
   const isMasked = () => MASKED_STATES.has(state);
   const contextTopicId = () =>
-    topic && (state === 'covered' || state === 'continued') ? topic.topicId : null;
+    reason?.kind === 'topic' && (state === 'covered' || state === 'continued') ? reason.topicId : null;
 
-  const setState = (next: PageState, nextTopic: PageTopic | null) => {
+  const setState = (next: PageState, nextReason: HideReason | null) => {
     const context = contextTopicId();
     const masked = isMasked();
     state = next;
-    topic = nextTopic;
+    reason = nextReason;
     render();
     if (masked !== isMasked()) events.onMaskChange(isMasked());
     if (context !== contextTopicId()) events.onContextChange();
@@ -87,9 +92,13 @@ export function guardPageCover(
     doc.body?.toggleAttribute('inert', isMasked());
 
     if (state === 'covered' || state === 'unchecked') {
+      const covering = state === 'covered' ? reason : null;
+      const source = subjectSource;
       mountPageCover(doc, {
-        topicName: state === 'covered' ? topic!.topicName : null,
-        onContinue: () => setState('continued', topic),
+        reason: covering && coverReason(covering),
+        onContinue: () => setState('continued', reason),
+        onBlockSource: covering?.kind === 'topic' && source ? () => void requestBlock(source) : undefined,
+        onUnblock: covering?.kind === 'blockedSource' ? () => void requestUnblock(covering.source) : undefined,
         onGoBack: () => {
           // A link opened in a new tab has nowhere to go back to.
           if (win.history.length > 1) win.history.back();
@@ -126,22 +135,26 @@ export function guardPageCover(
     subjectKey = key;
     staleText = subjectText;
     subjectText = null;
-    checkedText = null;
+    subjectSource = null;
+    checkedKey = null;
     // A title kept for the previous subject must not come back for this one.
     siteTitle = null;
     clearTimeout(uncheckedTimer);
   };
 
+  /** What a check looks at: the subject's text and the account that posted it. */
+  const checkKey = () => JSON.stringify([subjectText, subjectSource?.account ?? null]);
+
   const check = (matcher: Matcher, text: string) => {
-    checkedText = text;
+    checkedKey = checkKey();
     clearTimeout(uncheckedTimer);
-    const verdict = matcher.check({ text });
-    const verdictTopic = verdict.hide ? verdict.reason : null;
+    const verdict = matcher.check({ text, source: subjectSource });
+    const verdictReason = verdict.hide ? verdict.reason : null;
     if (state === 'continued') {
       // Continuing lasts for the page view: only learn what the page is about now.
-      setState('continued', verdictTopic);
+      setState('continued', verdictReason);
     } else {
-      setState(verdictTopic ? 'covered' : 'clean', verdictTopic);
+      setState(verdictReason ? 'covered' : 'clean', verdictReason);
     }
   };
 
@@ -159,15 +172,18 @@ export function guardPageCover(
         startUncheckedTimer();
         setState('pending', null);
       }
-      if (subject.text !== null && subject.text !== staleText) subjectText = subject.text;
+      if (subject.text !== null && subject.text !== staleText) {
+        subjectText = subject.text;
+        subjectSource = subject.source ?? null;
+      }
 
       const checkable =
         rechecking ||
         state === 'pending' ||
         state === 'unchecked' ||
         state === 'clean' ||
-        (state === 'continued' && topic === null);
-      if (checkable && matcher && subjectText !== null && subjectText !== checkedText) {
+        (state === 'continued' && reason === null);
+      if (checkable && matcher && subjectText !== null && checkKey() !== checkedKey) {
         check(matcher, subjectText);
       }
       // The site may have set its own tab title since.
@@ -181,7 +197,7 @@ export function guardPageCover(
   return {
     update,
     recheck(matcher) {
-      checkedText = null;
+      checkedKey = null;
       rechecking = true;
       try {
         update(matcher);
@@ -192,7 +208,7 @@ export function guardPageCover(
     cannotCheck() {
       if (subjectKey === null) return;
       clearTimeout(uncheckedTimer);
-      checkedText = null;
+      checkedKey = null;
       setState('unchecked', null);
     },
     isMasked,

@@ -1,8 +1,44 @@
+import type { BlockedSource } from '@/protection/state';
 import { readText, type ItemKind, type SiteAdapter } from '../adapter';
 import { skipCoveredSuggestions } from './suggestion-keys';
 
 const card = (selector: string): ItemKind => ({ selector, cover: 'card' });
 const inline = (selector: string): ItemKind => ({ selector, cover: 'inline' });
+
+/**
+ * The channel an element shows, from its first link to a channel: a handle such
+ * as "/@RockstarGames", or a channel id. Tiles and comments link their channel
+ * or author before anything else.
+ */
+function channelOf(element: Element): BlockedSource | null {
+  for (const link of [element, ...element.querySelectorAll('a[href]')]) {
+    const account = channelAccount(link.getAttribute('href'));
+    if (!account) continue;
+    const name = readText(link).replace(/\s+/g, ' ').trim();
+    return { site: 'youtube', account, name: name || account };
+  }
+  return null;
+}
+
+/** The channel a link points to, or null when it points elsewhere or can't be read. */
+function channelAccount(href: string | null): string | null {
+  if (!href) return null;
+  try {
+    const [first, second] = new URL(href, 'https://www.youtube.com').pathname.split('/').filter(Boolean);
+    if (first?.startsWith('@')) return decodeURIComponent(first).toLowerCase();
+    if (first === 'channel' && second) return decodeURIComponent(second);
+  } catch {
+    // A malformed link names no channel.
+  }
+  return null;
+}
+
+/** The channel of the video a watch page shows, from its name under the video. */
+function watchPageChannel(doc: Document): BlockedSource | null {
+  const owner = doc.querySelector('ytd-watch-metadata #owner');
+  const name = owner?.querySelector('ytd-channel-name');
+  return (name && channelOf(name)) ?? (owner && channelOf(owner));
+}
 
 export const youtube: SiteAdapter = {
   site: 'youtube',
@@ -42,6 +78,11 @@ export const youtube: SiteAdapter = {
   observedAttributes: ['video-id'],
   protectInteractions: skipCoveredSuggestions,
   itemText: readText,
+  itemSource(item) {
+    // A video's description links other channels, such as its game's; it belongs to the video's own.
+    if (item.matches('#description-inner')) return watchPageChannel(item.ownerDocument);
+    return channelOf(item);
+  },
   itemKey(item) {
     // Links may be relative or absolute, and an item can be a link itself.
     const url = [item, ...item.querySelectorAll('a[href]')]
@@ -68,6 +109,6 @@ export const youtube: SiteAdapter = {
     const titleText = title ? readText(title).trim() : '';
     if (!metadata || titleText === '') return { key, text: null };
     const channel = metadata.querySelector('#owner ytd-channel-name');
-    return { key, text: `${titleText} ${channel ? readText(channel) : ''}` };
+    return { key, text: `${titleText} ${channel ? readText(channel) : ''}`, source: watchPageChannel(doc) };
   },
 };

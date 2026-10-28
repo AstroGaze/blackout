@@ -5,7 +5,6 @@ import {
   addTopic,
   addUserTerm,
   removeUserTerm,
-  setUserTermCommonWord,
   TermTextError,
   topicNameWarning,
   userTermHint,
@@ -53,12 +52,10 @@ describe('storing your own Related Terms', () => {
     ]);
   });
 
-  it('stores a term marked as a common word as Weak, and can change it back', () => {
-    const weak = addUserTerm(severance(), 'severance', 'Mark', { commonWord: true });
-    expect(weak.topics[0]!.terms[0]).toMatchObject({ text: 'Mark', strength: 'weak' });
+  it('stores a term marked as a common word as Weak', () => {
+    const state = addUserTerm(severance(), 'severance', 'Mark', { commonWord: true });
 
-    const strong = setUserTermCommonWord(weak, 'severance', 'Mark', false);
-    expect(strong.topics[0]!.terms[0]).toMatchObject({ text: 'Mark', strength: 'strong' });
+    expect(state.topics[0]!.terms[0]).toMatchObject({ text: 'Mark', strength: 'weak', addedBy: 'user' });
   });
 
   it('keeps your term apart from the AI’s copy of the same word', () => {
@@ -78,14 +75,10 @@ describe('storing your own Related Terms', () => {
     expect(userTerms(state.topics[0]!).map((term) => term.text)).toEqual(['Lucia', 'Port Gellhorn']);
   });
 
-  it('removes and changes only your own copy of a term, never the AI’s', () => {
-    let state = addUserTerm(stateWithTopics(gta6()), GTA6_PRESET.id, 'jason', { commonWord: true });
-    state = setUserTermCommonWord(state, GTA6_PRESET.id, 'JASON', false);
-    expect(state.topics[0]!.terms.filter((term) => term.text === 'Jason')).toEqual([
-      expect.objectContaining({ strength: 'weak', addedBy: 'ai' }),
-    ]);
+  it('removes only your own copy of a term, never the AI’s', () => {
+    let state = addUserTerm(stateWithTopics(gta6()), GTA6_PRESET.id, 'jason');
 
-    state = removeUserTerm(state, GTA6_PRESET.id, 'Jason');
+    state = removeUserTerm(state, GTA6_PRESET.id, 'JASON');
 
     expect(state.topics[0]!.terms).toEqual(GTA6_PRESET.terms);
   });

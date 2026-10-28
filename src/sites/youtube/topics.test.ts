@@ -9,7 +9,6 @@ import {
   removeUserTerm,
   resumeTopic,
   setTopicEnabled,
-  setUserTermCommonWord,
   updateProtection,
 } from '@/protection/topics';
 import { GTA6_PRESET, protectionState } from '@/protection/state';
@@ -121,19 +120,6 @@ describe('your own Related Terms', () => {
       { title: 'Mark Rober builds a dam', state: 'shown' },
       { title: 'Mark confronts Milchick', state: 'covered', reason: 'Severance' },
     ]);
-  });
-
-  it('hides on its own again once a common word is marked as not common', async () => {
-    await protectionState.setValue(stateWithTopics());
-    await updateProtection((state) => addTopic(state, 'Severance'));
-    await updateProtection((state) => addUserTerm(state, 'severance', 'Lumon', { commonWord: true }));
-    const [tile] = await openFeed('Inside Lumon headquarters');
-    expect(viewItem(tile!)).toMatchObject({ state: 'shown' });
-
-    await updateProtection((state) => setUserTermCommonWord(state, 'severance', 'Lumon', false));
-    await settle();
-
-    expect(viewItem(tile!)).toMatchObject({ state: 'covered', reason: 'Severance' });
   });
 
   it('shows content again when you remove your term', async () => {

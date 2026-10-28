@@ -184,21 +184,6 @@ export function addUserTerm(
   });
 }
 
-/** Marks one of the user's terms as a common word (Weak) or not (Strong). */
-export function setUserTermCommonWord(
-  state: ProtectionState,
-  topicId: string,
-  text: string,
-  commonWord: boolean,
-): ProtectionState {
-  return changeTopic(state, topicId, (topic) => ({
-    ...topic,
-    terms: topic.terms.map((term) =>
-      isUserTerm(term, text) ? { ...term, strength: commonWord ? 'weak' : 'strong' } : term,
-    ),
-  }));
-}
-
 /** Removes one of the user's terms. An AI-added copy of the same word stays. */
 export function removeUserTerm(state: ProtectionState, topicId: string, text: string): ProtectionState {
   return changeTopic(state, topicId, (topic) => ({

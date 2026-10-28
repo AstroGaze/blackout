@@ -1,14 +1,13 @@
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useId, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import type { ProtectedTopic } from '@/protection/state';
 import {
   addUserTerm,
   removeUserTerm,
-  setUserTermCommonWord,
   TermTextError,
   updateProtection,
   userTermHint,
@@ -42,43 +41,64 @@ export function UserTerms({ topic }: { topic: ProtectedTopic }) {
   };
 
   return (
-    <section className="bg-card flex flex-col gap-5 rounded-2xl border p-6">
+    <section className="bg-card flex flex-col gap-4 rounded-2xl border p-6">
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-base leading-none font-semibold">Your terms</h2>
+        <h2 className="text-base leading-none font-semibold">Your own terms</h2>
         <p className="text-muted-foreground">
-          Words or phrases you want hidden along with {topic.name}. Each one hides content on its
-          own, unless you mark it as a common word.
+          You wrote these, so they’re shown without warnings. Refreshes never change them.
         </p>
       </div>
 
+      {terms.length > 0 && (
+        <ul aria-label={`Your own terms for ${topic.name}`} className="flex flex-wrap gap-2">
+          {terms.map((term) => (
+            <li
+              key={term.text}
+              className="bg-muted inline-flex h-7 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] font-medium"
+            >
+              {term.text}
+              {term.strength === 'weak' && (
+                <span className="text-muted-foreground text-xs font-normal">common word</span>
+              )}
+              <Button
+                variant="ghost"
+                aria-label={`Remove ${term.text}`}
+                className="text-muted-foreground size-[22px] rounded-sm p-0"
+                onClick={() => updateProtection((state) => removeUserTerm(state, topic.id, term.text))}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <form onSubmit={submit} className="flex flex-col gap-2">
-        <Label htmlFor={inputId} className="sr-only">
-          Term
-        </Label>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Input
-            id={inputId}
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value);
-              setError(null);
-            }}
-            placeholder="A character, place or nickname"
-            autoComplete="off"
-            className="max-w-xs flex-[1_1_200px]"
-            aria-invalid={error !== null}
-            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
-          />
-          <div className="flex items-center gap-2">
-            <Switch id={commonWordId} checked={commonWord} onCheckedChange={setCommonWord} />
-            <Label htmlFor={commonWordId} className="font-normal">
-              Common word
-            </Label>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-[1_1_260px] flex-col gap-2">
+            <Label htmlFor={inputId}>Add a term</Label>
+            <Input
+              id={inputId}
+              value={text}
+              onChange={(event) => {
+                setText(event.target.value);
+                setError(null);
+              }}
+              placeholder="A name, place or phrase"
+              autoComplete="off"
+              aria-invalid={error !== null}
+              aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
+            />
           </div>
-          <Button type="submit" variant="outline">
-            <Plus />
-            Add
-          </Button>
+          <div className="flex h-9 items-center gap-2">
+            <Checkbox
+              id={commonWordId}
+              checked={commonWord}
+              onCheckedChange={(checked) => setCommonWord(checked === true)}
+            />
+            <Label htmlFor={commonWordId}>This is a common word</Label>
+          </div>
+          <Button type="submit">Add</Button>
         </div>
         {error && (
           <p id={`${inputId}-error`} className="text-destructive text-sm">
@@ -91,45 +111,6 @@ export function UserTerms({ topic }: { topic: ProtectedTopic }) {
           </p>
         )}
       </form>
-
-      {terms.length === 0 ? (
-        <p className="text-muted-foreground">None yet.</p>
-      ) : (
-        <ul aria-label={`Your terms for ${topic.name}`} className="flex flex-col divide-y rounded-lg border">
-          {terms.map((term) => (
-            <UserTermRow key={term.text} topic={topic} text={term.text} weak={term.strength === 'weak'} />
-          ))}
-        </ul>
-      )}
     </section>
-  );
-}
-
-function UserTermRow({ topic, text, weak }: { topic: ProtectedTopic; text: string; weak: boolean }) {
-  const commonWordId = useId();
-  return (
-    <li className="flex items-center gap-4 px-3.5 py-2">
-      <span className="min-w-0 flex-1 truncate font-medium">{text}</span>
-      <div className="flex items-center gap-2">
-        <Switch
-          id={commonWordId}
-          checked={weak}
-          onCheckedChange={(checked) =>
-            updateProtection((state) => setUserTermCommonWord(state, topic.id, text, checked))
-          }
-        />
-        <Label htmlFor={commonWordId} className="text-muted-foreground font-normal">
-          Common word
-        </Label>
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={`Remove ${text}`}
-        onClick={() => updateProtection((state) => removeUserTerm(state, topic.id, text))}
-      >
-        <X />
-      </Button>
-    </li>
   );
 }

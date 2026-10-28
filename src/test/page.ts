@@ -3,13 +3,21 @@
 
 import { COVER_TAG, PAGE_COVER_TAG } from '@/cover/mount';
 
-/** Replaces the page body and tab title with those of `html`, as if the site rendered it. */
+/**
+ * Replaces the page body and tab title with those of `html`, as if the site
+ * rendered it. It parses with a template in `doc`: a separate parsed document per
+ * page stays in memory in the simulated DOM, and the saved pages are large. The
+ * body goes in as one change, as a site's render would.
+ */
 export function renderPage(html: string, doc: Document = document): void {
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
-  doc.title = parsed.title;
-  doc.body.replaceChildren(
-    ...Array.from(parsed.body.childNodes, (node) => doc.importNode(node, true)),
-  );
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '';
+  const decoder = doc.createElement('textarea');
+  decoder.innerHTML = title;
+  doc.title = decoder.value;
+  const bodyStart = html.indexOf('>', html.search(/<body[\s>]/i)) + 1;
+  const template = doc.createElement('template');
+  template.innerHTML = html.slice(bodyStart, html.search(/<\/body>/i));
+  doc.body.replaceChildren(template.content);
 }
 
 /** Lets pending storage reads and mutation callbacks run. */

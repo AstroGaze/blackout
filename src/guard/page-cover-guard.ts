@@ -21,8 +21,12 @@ type PageTopic = Pick<HideReason, 'topicId' | 'topicName'>;
 const MASKED_STATES: ReadonlySet<PageState> = new Set(['pending', 'covered', 'unchecked']);
 
 export interface PageCoverGuard {
-  /** Re-evaluates the page after the site changed it or the matcher changed. */
+  /** Re-evaluates the page after the site changed it. */
   update(matcher: Matcher | null): void;
+  /** Checks the page again with a new matcher, as after the Protected Topics changed. */
+  recheck(matcher: Matcher): void;
+  /** Covers a page about one thing as unchecked, as when the protection state is broken. */
+  cannotCheck(): void;
   /** Whether the page is hidden or covered, so nothing on it may show or play. */
   isMasked(): boolean;
   /** Topics the page is about, so Weak Terms on it count. */
@@ -59,6 +63,8 @@ export function guardPageCover(
   /** The site's own tab title for the current subject, kept while it is masked. */
   let siteTitle: string | null = null;
   let uncheckedTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Set while checking again after the Protected Topics changed, whatever the state. */
+  let rechecking = false;
 
   const isMasked = () => MASKED_STATES.has(state);
   const contextTopicId = () =>
@@ -132,8 +138,8 @@ export function guardPageCover(
     const verdict = matcher.check({ text });
     const verdictTopic = verdict.hide ? verdict.reason : null;
     if (state === 'continued') {
-      // Continued past an unchecked cover: only learn what the page is about.
-      setState(verdictTopic ? 'continued' : 'clean', verdictTopic);
+      // Continuing lasts for the page view: only learn what the page is about now.
+      setState('continued', verdictTopic);
     } else {
       setState(verdictTopic ? 'covered' : 'clean', verdictTopic);
     }
@@ -156,6 +162,7 @@ export function guardPageCover(
       if (subject.text !== null && subject.text !== staleText) subjectText = subject.text;
 
       const checkable =
+        rechecking ||
         state === 'pending' ||
         state === 'unchecked' ||
         state === 'clean' ||
@@ -173,6 +180,21 @@ export function guardPageCover(
 
   return {
     update,
+    recheck(matcher) {
+      checkedText = null;
+      rechecking = true;
+      try {
+        update(matcher);
+      } finally {
+        rechecking = false;
+      }
+    },
+    cannotCheck() {
+      if (subjectKey === null) return;
+      clearTimeout(uncheckedTimer);
+      checkedText = null;
+      setState('unchecked', null);
+    },
     isMasked,
     contextTopicIds: () => {
       const id = contextTopicId();

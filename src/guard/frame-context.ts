@@ -71,6 +71,7 @@ export function inheritPageContext(win: Window, onChange: () => void) {
   const stop = () => {
     for (const unsubscribe of subscribed.values()) unsubscribe();
     subscribed.clear();
+    win.removeEventListener('pagehide', stop);
   };
   win.addEventListener('pagehide', stop);
 

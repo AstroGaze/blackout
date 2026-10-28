@@ -1,6 +1,6 @@
 import { COVER_TAG, mountCover, unmountCover } from '@/cover/mount';
 import { compileMatcher, type HideReason, type Matcher } from '@/matcher/matcher';
-import { protectionState } from '@/protection/state';
+import { nextPauseEnd, protectionState, type ProtectionState } from '@/protection/state';
 import type { CoverLayout, SiteAdapter } from '@/sites/adapter';
 import { inheritPageContext, sharePageContext } from './frame-context';
 import { holdMedia, holdMediaIn, releaseMediaIn } from './media';
@@ -120,14 +120,17 @@ export function startPageGuard(
   };
 
   /** Checks every item again, as when the page's own topic changes what Weak Terms mean. */
-  const recheckAll = () => {
+  /** Acts on every item on the page, the outermost one where items nest. */
+  const forEachItem = (act: (item: Element) => void) => {
     for (const element of doc.querySelectorAll(selector)) {
-      const item = itemOf(element)!;
-      if (item !== element) continue;
-      checkedText.delete(item);
-      check(item);
+      if (itemOf(element) === element) act(element);
     }
   };
+  const recheckAll = () =>
+    forEachItem((item) => {
+      checkedText.delete(item);
+      check(item);
+    });
   /** Nothing hidden or covered may play, so a video can't spoil by sound. */
   const mayPlay = (media: HTMLMediaElement) => {
     if (page.isMasked()) return false;
@@ -154,14 +157,21 @@ export function startPageGuard(
   const sharing = sharePageContext(win, () => page.contextTopicIds());
   page.update(null);
 
+  /** Items with a cover mounted, so stopping can take every cover down. */
+  const coveredItems = new Set<Element>();
+  const removeCover = (item: Element) => {
+    unmountCover(item);
+    coveredItems.delete(item);
+  };
+
   const withhold = (item: Element) => {
     checkedText.delete(item);
-    unmountCover(item);
+    removeCover(item);
     setState(item, null);
   };
 
   const show = (item: Element, state: 'clean' | 'revealed') => {
-    unmountCover(item);
+    removeCover(item);
     setState(item, state);
     releaseMediaIn(item, mayPlay);
   };
@@ -170,6 +180,7 @@ export function startPageGuard(
     setState(item, 'covered');
     coverReasons.set(item, reason);
     holdMediaIn(item);
+    coveredItems.add(item);
     mountCover(item, {
       layout: coverLayoutOf(item),
       topicName: reason.topicName,
@@ -184,7 +195,7 @@ export function startPageGuard(
   const check = (item: Element) => {
     for (const nested of item.querySelectorAll(selector)) {
       // It may have been an item of its own before the site wrapped it.
-      unmountCover(nested);
+      removeCover(nested);
       setState(nested, 'nested');
     }
     if (!matcher) {
@@ -252,27 +263,66 @@ export function startPageGuard(
     },
   });
 
+  /** Hides every item until a check can run again. */
+  const withholdAll = () => forEachItem(withhold);
+
   let stopped = false;
+  let pauseEndTimer: ReturnType<typeof setTimeout> | undefined;
+  let pauseEnd: number | null = null;
+  let latestState: ProtectionState | null = null;
+  /** Compiles the protection state and checks the page and every item against it. */
+  const applyState = (state: ProtectionState) => {
+    if (stopped) return;
+    clearTimeout(pauseEndTimer);
+    latestState = state;
+    const now = Date.now();
+    try {
+      matcher = compileMatcher(state, now);
+    } catch (error) {
+      // Without a matcher nothing passes a check, so everything stays hidden.
+      console.error('[Blackout] Could not use the protection state', error);
+      matcher = null;
+      withholdAll();
+      page.cannotCheck();
+      return;
+    }
+    page.recheck(matcher);
+    awaitingMatcher.clear();
+    recheckAll();
+    // A Pause switches its topic back on by itself when it ends.
+    pauseEnd = nextPauseEnd(state, now);
+    if (pauseEnd !== null) pauseEndTimer = setTimeout(() => applyState(state), pauseEnd - now);
+  };
+  // Timers can fire late after the computer sleeps; check again when the tab shows.
+  const catchUpOnPauses = () => {
+    if (latestState && pauseEnd !== null && pauseEnd <= Date.now()) applyState(latestState);
+  };
+  doc.addEventListener('visibilitychange', catchUpOnPauses);
+  win.addEventListener('focus', catchUpOnPauses);
+
   protectionState
     .getValue()
-    .then((state) => {
-      if (stopped) return;
-      matcher = compileMatcher(state);
-      page.update(matcher);
-      for (const item of awaitingMatcher) if (item.isConnected) check(item);
-      awaitingMatcher.clear();
-    })
+    .then(applyState)
     .catch((error) => {
       // Without a matcher nothing passes a check, so everything stays hidden.
       console.error('[Blackout] Could not load protection state', error);
     });
+  // Open pages react straight away when the Protected Topics change.
+  const stopWatching = protectionState.watch((state) => {
+    if (state) applyState(state);
+  });
 
   return {
     stop() {
       stopped = true;
+      clearTimeout(pauseEndTimer);
+      doc.removeEventListener('visibilitychange', catchUpOnPauses);
+      win.removeEventListener('focus', catchUpOnPauses);
+      stopWatching();
       observer.disconnect();
       doc.removeEventListener('play', pauseIfHidden, true);
       stopProtectingInteractions?.();
+      for (const item of coveredItems) removeCover(item);
       page.stop();
       sharing.stop();
       inherited.stop();

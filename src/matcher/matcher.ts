@@ -1,4 +1,4 @@
-import type { ProtectedTopic, ProtectionState } from '@/protection/state';
+import { isTopicActive, type ProtectedTopic, type ProtectionState } from '@/protection/state';
 
 export interface HideReason {
   kind: 'topic';
@@ -64,7 +64,7 @@ interface CompiledTerm {
  * Compiles the protection state into a matcher, once per state change. Throws on
  * malformed state rather than quietly matching less.
  */
-export function compileMatcher(state: ProtectionState): Matcher {
+export function compileMatcher(state: ProtectionState, now = Date.now()): Matcher {
   const activeTopics: ProtectedTopic[] = [];
   const termsByPattern = new Map<string, Set<CompiledTerm>>();
   /** For each word a pattern can start with, the word counts of those patterns. */
@@ -72,12 +72,13 @@ export function compileMatcher(state: ProtectionState): Matcher {
 
   for (const topic of state.topics) {
     if (typeof topic.name !== 'string') throw new Error('Malformed topic');
-    // Only an explicit switch-off counts, so a missing flag keeps protection on.
-    if (topic.enabled === false) continue;
+    if (!isTopicActive(topic, now)) continue;
     activeTopics.push(topic);
     /** The topic's terms by their run-together form, so spelling variants count once. */
     const termsByJoinedForm = new Map<string, CompiledTerm>();
-    for (const term of topic.terms) {
+    // The topic's name protects on its own, as a Strong Term.
+    const nameTerm = { text: topic.name, strength: 'strong' } as const;
+    for (const term of [nameTerm, ...topic.terms]) {
       if (typeof term.text !== 'string' || (term.strength !== 'strong' && term.strength !== 'weak')) {
         throw new Error(`Malformed term in topic "${topic.name}"`);
       }

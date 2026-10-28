@@ -1,0 +1,14 @@
+/* Styles for the extension's own pages: the popup and the settings page. */
+@import 'tailwindcss' source(none);
+@import './theme.css';
+@source '../components';
+@source '../entrypoints';
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}

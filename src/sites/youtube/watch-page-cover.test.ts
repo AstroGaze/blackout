@@ -3,6 +3,8 @@ import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { startPageGuard, type PageGuard } from '@/guard/page-guard';
 import * as page from '@/test/page';
 import { clickPageCoverButton, renderPage, settle, viewPage } from '@/test/page';
+import { GTA6_PRESET } from '@/protection/state';
+import { setTopicEnabled, updateProtection } from '@/protection/topics';
 import { youtube } from './adapter';
 import gtaWatchPage from './fixtures/watch.html?raw';
 import otherWatchPage from './fixtures/watch-other.html?raw';
@@ -188,6 +190,45 @@ describe('YouTube watch pages with the ready-made GTA 6 topic', () => {
 
     expect(viewPage()).toMatchObject({ state: 'shown' });
     expect(page.viewItem(description)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+  });
+
+  it('removes the cover, without a reload, when the topic is turned off', async () => {
+    startLoading(GTA_VIDEO, gtaWatchPage);
+    await settle();
+
+    await updateProtection((state) => setTopicEnabled(state, GTA6_PRESET.id, false));
+    await settle();
+
+    expect(viewPage()).toEqual({ title: 'Grand Theft Auto VI Trailer 2 - YouTube', state: 'shown' });
+  });
+
+  it('keeps a continued page continued when its topic is turned off and on again', async () => {
+    startLoading(GTA_VIDEO, gtaWatchPage);
+    await settle();
+    clickPageCoverButton('Continue to page');
+    await settle();
+    clickPageCoverButton('Continue');
+    await settle();
+
+    await updateProtection((state) => setTopicEnabled(state, GTA6_PRESET.id, false));
+    await settle();
+    await updateProtection((state) => setTopicEnabled(state, GTA6_PRESET.id, true));
+    await settle();
+
+    expect(viewPage()).toEqual({ title: 'Grand Theft Auto VI Trailer 2 - YouTube', state: 'shown' });
+    // The page is about GTA 6 again, so Weak Terms on it count again.
+    expect(coveredTitles(COMMENT)).toContain('Jason got more leaks to fix');
+  });
+
+  it('masks the page while the stored protection state is broken', async () => {
+    startLoading(OTHER_VIDEO, otherWatchPage);
+    await settle();
+
+    await fakeBrowser.storage.local.set({ protectionState: { topics: [{ name: 'GTA 6', terms: [{ text: null }] }] } });
+    await settle();
+
+    expect(viewPage()).toMatchObject({ title: MASKED_TITLE });
+    expect(viewPage().state).not.toBe('shown');
   });
 
   it('removes the cover after leaving the watch page for the home feed', async () => {

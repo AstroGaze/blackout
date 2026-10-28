@@ -80,6 +80,24 @@ export const GTA6_PRESET: ProtectedTopic = {
   ],
 };
 
+/**
+ * Whether a topic protects right now: not switched off and not paused. Only an
+ * explicit switch-off counts, so a missing flag keeps protection on.
+ */
+export function isTopicActive(topic: ProtectedTopic, now = Date.now()): boolean {
+  return topic.enabled !== false && !isPaused(topic, now);
+}
+
+export function isPaused(topic: ProtectedTopic, now = Date.now()): boolean {
+  return typeof topic.pausedUntil === 'number' && topic.pausedUntil > now;
+}
+
+/** When the next Pause ends (epoch ms), or null when nothing is paused. */
+export function nextPauseEnd(state: ProtectionState, now = Date.now()): number | null {
+  const ends = state.topics.filter((topic) => isPaused(topic, now)).map((topic) => topic.pausedUntil!);
+  return ends.length > 0 ? Math.min(...ends) : null;
+}
+
 export function initialProtectionState(): ProtectionState {
   return {
     topics: [structuredClone(GTA6_PRESET)],

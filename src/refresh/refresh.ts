@@ -164,8 +164,11 @@ async function wikipediaArticle(name: string, language: string): Promise<string 
   return text ? text.slice(0, MATERIAL_LIMIT) : null;
 }
 
-/** Wikimedia asks browser clients to name themselves in this header. */
-const API_USER_AGENT = 'Blackout/0.1 (spoiler-blocking browser extension)';
+/**
+ * Wikimedia asks browser clients to name themselves in this header, with a way
+ * to reach the developer.
+ */
+const API_USER_AGENT = 'Blackout/0.1 (https://github.com/AstroGaze/blackout; spoiler-blocking browser extension)';
 
 /** Wikipedia is asked at most this many times for each thing Blackout reads. */
 const WIKIPEDIA_ATTEMPTS = 3;

@@ -145,6 +145,19 @@ describe('building a topic’s Related Terms', () => {
     expect(hosts).toEqual(new Set(['en.wikipedia.org', 'api.deepseek.com']));
   });
 
+  it('tells Wikipedia who is asking, with a link to the project', async () => {
+    await severanceProtected();
+    const { fetch } = network({ modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    const wikipediaHeaders = fetch.mock.calls
+      .filter(([input]) => new URL(String(input)).hostname.endsWith('.wikipedia.org'))
+      .map(([, init]) => new Headers(init?.headers).get('Api-User-Agent'));
+    expect(wikipediaHeaders).not.toHaveLength(0);
+    for (const header of wikipediaHeaders) expect(header).toContain('https://github.com/AstroGaze/blackout');
+  });
+
   it('gives the model the article about the media, not another page that shares its name', async () => {
     await severanceProtected();
     const { modelRequests } = network({ modelReplies: [deepseekReply(WELL_FORMED)] });

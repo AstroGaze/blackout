@@ -47,13 +47,24 @@ function otherArticle(title: string) {
 }
 
 /**
- * Replaces the network: Wikipedia answers from the recorded responses (or with
- * `wikipedia`), and the model server gives `modelReplies` in order.
+ * Replaces the network: Wikipedia answers with `wikipediaFirst` in order, then
+ * from the recorded responses (or always with `wikipedia`), and the model server
+ * gives `modelReplies` in order.
  */
-function network({ wikipedia, modelReplies }: { wikipedia?: Response; modelReplies: Response[] }) {
+function network({
+  wikipedia,
+  wikipediaFirst = [],
+  modelReplies,
+}: {
+  wikipedia?: Response;
+  wikipediaFirst?: Response[];
+  modelReplies: Response[];
+}) {
   const fetch = vi.fn(async (input: string | URL, _init?: RequestInit) => {
     const url = new URL(String(input));
     if (url.hostname.endsWith('.wikipedia.org')) {
+      const next = wikipediaFirst.shift();
+      if (next) return next;
       if (wikipedia) return wikipedia.clone();
       if (url.searchParams.get('list') === 'search') return Response.json(wikipediaSearch);
       return url.searchParams.get('titles') === 'Severance (TV series)'
@@ -66,11 +77,13 @@ function network({ wikipedia, modelReplies }: { wikipedia?: Response; modelRepli
     throw new TypeError(`Unexpected request to ${url}`);
   });
   vi.stubGlobal('fetch', fetch);
+  const wikipediaRequests = () =>
+    fetch.mock.calls.filter(([input]) => new URL(String(input)).hostname.endsWith('.wikipedia.org')).length;
   const modelRequests = () =>
     fetch.mock.calls
       .filter(([input]) => new URL(String(input)).hostname === 'api.deepseek.com')
       .map(([, init]) => JSON.parse(String(init?.body)) as { messages: { role: string; content: string }[] });
-  return { fetch, modelRequests };
+  return { fetch, modelRequests, wikipediaRequests };
 }
 
 /** A state with Severance protected by name, and a model connected unless `model` is null. */
@@ -87,9 +100,17 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+/** Lets the refresh's waits pass, as if minutes went by. */
+async function withTimePassing(refreshed: Promise<void>): Promise<void> {
+  vi.useFakeTimers();
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  await refreshed;
+}
 
 describe('building a topic’s Related Terms', () => {
   it('stores the model’s terms from a well-formed DeepSeek reply, with their levels and strengths', async () => {
@@ -177,12 +198,83 @@ describe('building a topic’s Related Terms', () => {
       modelReplies: [deepseekReply(WELL_FORMED)],
     });
 
-    await refreshTopic('severance');
+    await withTimePassing(refreshTopic('severance'));
 
     expect(JSON.stringify(modelRequests())).toContain('Severance');
     const stored = await storedTopic();
     expect(aiTerms(stored.terms)).toHaveLength(5);
     expect(stored.lastRefresh).toMatchObject({ ok: true, sourcesRead: [] });
+  });
+});
+
+describe('when Wikipedia limits how often it can be asked', () => {
+  const rateLimited = (retryAfter?: string) =>
+    new Response('You are making too many requests to the API.', {
+      status: 429,
+      headers: retryAfter ? { 'Retry-After': retryAfter } : {},
+    });
+
+  it('waits as long as Wikipedia asks before trying again', async () => {
+    await severanceProtected();
+    const { wikipediaRequests } = network({ wikipediaFirst: [rateLimited('7')], modelReplies: [deepseekReply(WELL_FORMED)] });
+    vi.useFakeTimers();
+
+    const refreshed = refreshTopic('severance');
+    await vi.advanceTimersByTimeAsync(6_900);
+    expect(wikipediaRequests()).toBe(1);
+    await vi.advanceTimersByTimeAsync(200);
+    await refreshed;
+
+    expect(wikipediaRequests()).toBe(3);
+    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Wikipedia'] });
+  });
+
+  it('waits at least 5 seconds, then longer, when Wikipedia doesn’t say how long', async () => {
+    await severanceProtected();
+    const unavailable = () => new Response('Service Temporarily Unavailable', { status: 503 });
+    const { wikipediaRequests } = network({
+      wikipediaFirst: [unavailable(), unavailable()],
+      modelReplies: [deepseekReply(WELL_FORMED)],
+    });
+    vi.useFakeTimers();
+
+    const refreshed = refreshTopic('severance');
+    await vi.advanceTimersByTimeAsync(4_900);
+    expect(wikipediaRequests()).toBe(1);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(wikipediaRequests()).toBe(2);
+    await vi.advanceTimersByTimeAsync(9_800);
+    expect(wikipediaRequests()).toBe(2);
+    await vi.advanceTimersByTimeAsync(200);
+    await refreshed;
+
+    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Wikipedia'] });
+  });
+
+  it('goes on without Wikipedia rather than wait longer than a minute', async () => {
+    await severanceProtected();
+    const { wikipediaRequests, modelRequests } = network({
+      wikipedia: rateLimited('3600'),
+      modelReplies: [deepseekReply(WELL_FORMED)],
+    });
+
+    await refreshTopic('severance');
+
+    expect(wikipediaRequests()).toBe(1);
+    expect(modelRequests()).toHaveLength(1);
+    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: [] });
+  });
+
+  it('doesn’t ask again for an article that doesn’t exist', async () => {
+    await severanceProtected();
+    const { wikipediaRequests } = network({
+      wikipedia: Response.json({ error: { code: 'badvalue' } }, { status: 400 }),
+      modelReplies: [deepseekReply(WELL_FORMED)],
+    });
+
+    await refreshTopic('severance');
+
+    expect(wikipediaRequests()).toBe(1);
   });
 });
 

@@ -24,10 +24,11 @@ const MODEL_TIMEOUT_MS = 5 * 60_000;
 const WIKIPEDIA_TIMEOUT_MS = 20_000;
 
 /**
- * The longest a refresh can run: two model calls and four Wikipedia reads. One
- * that began longer ago than this never finished.
+ * The longest a refresh can run: two model calls, and two Wikipedia reads of
+ * three attempts each with the waits between them. One that began longer ago
+ * than this never finished.
  */
-const REFRESH_LIMIT_MS = 2 * MODEL_TIMEOUT_MS + 4 * WIKIPEDIA_TIMEOUT_MS + 60_000;
+const REFRESH_LIMIT_MS = 2 * MODEL_TIMEOUT_MS + 2 * (3 * WIKIPEDIA_TIMEOUT_MS + 2 * 60_000) + 60_000;
 
 /** Why building terms failed, worded for the settings page. */
 class RefreshError extends Error {}
@@ -166,21 +167,44 @@ async function wikipediaArticle(name: string, language: string): Promise<string 
 /** Wikimedia asks browser clients to name themselves in this header. */
 const API_USER_AGENT = 'Blackout/0.1 (spoiler-blocking browser extension)';
 
-/** Fetches JSON, trying once more after a moment if it fails, or null when it can't be read. */
+/** Wikipedia is asked at most this many times for each thing Blackout reads. */
+const WIKIPEDIA_ATTEMPTS = 3;
+
+/** Waiting longer than this for Wikipedia would hold up the refresh too long. */
+const LONGEST_WAIT_MS = 60_000;
+
+/**
+ * Fetches JSON from Wikipedia, or null when it can't be read. When Wikipedia is
+ * busy or limiting requests, it waits as long as Wikipedia asks, or else 5 and
+ * then 10 seconds, as Wikimedia's rate-limit rules ask clients to.
+ */
 async function readJson<T>(url: string): Promise<T | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
+  for (let attempt = 1; ; attempt++) {
+    let wait: number;
     try {
       const response = await fetch(url, {
         headers: { 'Api-User-Agent': API_USER_AGENT },
         signal: AbortSignal.timeout(WIKIPEDIA_TIMEOUT_MS),
       });
       if (response.ok) return (await response.json()) as T;
+      // Only a busy or rate-limited Wikipedia is worth asking again.
+      if (response.status !== 429 && response.status < 500) return null;
+      wait = retryAfterMs(response.headers.get('Retry-After')) ?? 5_000 * 2 ** (attempt - 1);
     } catch {
-      // Tried again, then given up on.
+      wait = 5_000 * 2 ** (attempt - 1);
     }
+    if (attempt === WIKIPEDIA_ATTEMPTS || wait > LONGEST_WAIT_MS) return null;
+    await new Promise((resolve) => setTimeout(resolve, wait));
   }
-  return null;
+}
+
+/** A Retry-After header, in seconds or as a date, as milliseconds to wait. */
+function retryAfterMs(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
 }
 
 interface FoundTerm {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { Logo } from '@/components/logo';
 import { PauseMenu } from '@/components/pause-menu';
+import { UserTerms } from '@/components/user-terms';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,7 @@ import {
   setTopicEnabled,
   topicStatus,
   updateProtection,
+  userTerms,
 } from '@/protection/topics';
 
 export function App() {
@@ -164,6 +166,7 @@ function TopicPanel({ topic, now }: { topic: ProtectedTopic; now: number }) {
       </div>
 
       <RelatedTermsSummary topic={topic} />
+      <UserTerms topic={topic} />
     </>
   );
 }
@@ -177,13 +180,14 @@ const LEVELS: { level: SpoilerLevel; label: string }[] = [
 /** How many Related Terms the topic has per Spoiler Level, without showing any of them. */
 function RelatedTermsSummary({ topic }: { topic: ProtectedTopic }) {
   const generated = topic.terms.filter((term) => term.addedBy === 'ai');
+  const andYours = userTerms(topic).length > 0 ? ', and by your own terms' : '';
   return (
     <section className="bg-card flex flex-col gap-5 rounded-2xl border p-6">
       <div className="flex flex-col gap-1.5">
         <h2 className="text-base leading-none font-semibold">Related Terms</h2>
         <p className="text-muted-foreground">
           {generated.length === 0
-            ? `None yet. ${topic.name} is protected by its name, including its spacing and hashtag variants.`
+            ? `None yet. ${topic.name} is protected by its name, including its spacing and hashtag variants${andYours}.`
             : 'Hidden to protect you.'}
         </p>
       </div>

@@ -1,6 +1,12 @@
 import { normalize } from '@/matcher/matcher';
 import { COMMON_WORDS_BY_LANGUAGE } from './common-words';
-import { isPaused, protectionState, type ProtectedTopic, type ProtectionState } from './state';
+import {
+  isPaused,
+  protectionState,
+  type ProtectedTopic,
+  type ProtectionState,
+  type RelatedTerm,
+} from './state';
 
 const MINUTE = 60 * 1000;
 
@@ -33,17 +39,36 @@ function isCommonWord(word: string): boolean {
  * specific enough.
  */
 export function topicNameWarning(name: string): string | null {
-  const words = normalize(name).split(' ').filter(Boolean);
-  if (words.length !== 1) return null;
-  const word = words[0]!;
+  const kind = broadWordKind(name);
+  if (kind === null) return null;
   const shown = name.trim();
   const fuller = 'A fuller name, such as its complete title, hides less.';
-  if (isCommonWord(word)) {
+  if (kind === 'everyday') {
     return `“${shown}” is an everyday word, so Blackout will hide anything that uses it, not just ${shown}. ${fuller}`;
   }
-  if (word.length <= 2 || /^\d+$/.test(word)) {
-    return `“${shown}” is very short, so Blackout will hide anything that contains it as a word, not just ${shown}. ${fuller}`;
-  }
+  return `“${shown}” is very short, so Blackout will hide anything that contains it as a word, not just ${shown}. ${fuller}`;
+}
+
+/**
+ * The user's own terms are Strong unless marked as a common word, so a term that
+ * is a single everyday word, a very short word or a plain number hides far more
+ * than the topic. Returns a hint to mark it as a common word, or null.
+ */
+export function userTermHint(text: string, topicName: string): string | null {
+  const kind = broadWordKind(text);
+  if (kind === null) return null;
+  const shown = text.trim();
+  const what = kind === 'everyday' ? 'an everyday word' : 'very short';
+  return `“${shown}” is ${what}. Mark it as a common word so it only hides alongside ${topicName} or its other terms.`;
+}
+
+/** Whether `text` is a single word that, on its own, hides far more than one topic. */
+function broadWordKind(text: string): 'everyday' | 'short' | null {
+  const words = normalize(text).split(' ').filter(Boolean);
+  if (words.length !== 1) return null;
+  const word = words[0]!;
+  if (isCommonWord(word)) return 'everyday';
+  if (word.length <= 2 || /^\d+$/.test(word)) return 'short';
   return null;
 }
 
@@ -104,6 +129,82 @@ export function resumeTopic(state: ProtectionState, id: string): ProtectionState
 
 export function deleteTopic(state: ProtectionState, id: string): ProtectionState {
   return { ...state, topics: state.topics.filter((topic) => topic.id !== id) };
+}
+
+/** Why a term can't be added, worded for the person typing it. */
+export class TermTextError extends Error {}
+
+/**
+ * The topic's terms the user added, in the order they added them. They are kept
+ * apart from AI-added ones, even for the same word, so a refresh never touches them.
+ */
+export function userTerms(topic: ProtectedTopic): RelatedTerm[] {
+  return topic.terms.filter((term) => term.addedBy === 'user');
+}
+
+/** A term's run-together form: the matcher reads "#Lumon" and "Lu mon" as "Lumon" too. */
+function joinedForm(text: string): string {
+  return normalize(text).replaceAll(' ', '');
+}
+
+/** Whether `term` is the user's own copy of `text`, compared as the matcher reads it. */
+function isUserTerm(term: RelatedTerm, text: string): boolean {
+  return term.addedBy === 'user' && joinedForm(term.text) === joinedForm(text);
+}
+
+/**
+ * Adds the user's own Related Term to a topic. It is Strong unless marked as a
+ * common word, which makes it Weak.
+ */
+export function addUserTerm(
+  state: ProtectionState,
+  topicId: string,
+  text: string,
+  { commonWord = false } = {},
+): ProtectionState {
+  const trimmed = text.trim();
+  if (normalize(trimmed) === '') throw new TermTextError('Type a word or phrase to hide.');
+  return changeTopic(state, topicId, (topic) => {
+    if (joinedForm(topic.name) === joinedForm(trimmed)) {
+      throw new TermTextError(`${topic.name} is already protected by its name.`);
+    }
+    const existing = topic.terms.find((term) => isUserTerm(term, trimmed));
+    if (existing) throw new TermTextError(`${existing.text} is already one of your terms.`);
+    const term: RelatedTerm = {
+      text: trimmed,
+      // Spoiler Levels rate what the AI found; the user already knows their own terms.
+      // The term viewer and its counts show AI-added terms only.
+      level: 'common',
+      strength: commonWord ? 'weak' : 'strong',
+      // Typed by the user, in whatever language they wrote it.
+      language: 'und',
+      addedBy: 'user',
+    };
+    return { ...topic, terms: [...topic.terms, term] };
+  });
+}
+
+/** Marks one of the user's terms as a common word (Weak) or not (Strong). */
+export function setUserTermCommonWord(
+  state: ProtectionState,
+  topicId: string,
+  text: string,
+  commonWord: boolean,
+): ProtectionState {
+  return changeTopic(state, topicId, (topic) => ({
+    ...topic,
+    terms: topic.terms.map((term) =>
+      isUserTerm(term, text) ? { ...term, strength: commonWord ? 'weak' : 'strong' } : term,
+    ),
+  }));
+}
+
+/** Removes one of the user's terms. An AI-added copy of the same word stays. */
+export function removeUserTerm(state: ProtectionState, topicId: string, text: string): ProtectionState {
+  return changeTopic(state, topicId, (topic) => ({
+    ...topic,
+    terms: topic.terms.filter((term) => !isUserTerm(term, text)),
+  }));
 }
 
 /** Changes made from this page, one after another so none overwrites another. */

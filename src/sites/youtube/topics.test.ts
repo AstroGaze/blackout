@@ -3,10 +3,13 @@ import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { startPageGuard, type PageGuard } from '@/guard/page-guard';
 import {
   addTopic,
+  addUserTerm,
   deleteTopic,
   pauseTopic,
+  removeUserTerm,
   resumeTopic,
   setTopicEnabled,
+  setUserTermCommonWord,
   updateProtection,
 } from '@/protection/topics';
 import { GTA6_PRESET, protectionState } from '@/protection/state';
@@ -88,6 +91,72 @@ describe('managing Protected Topics while YouTube is open', () => {
       { title: 'GTA 6 trailer breakdown', state: 'shown' },
       { title: 'Severance finale', state: 'covered', reason: 'Severance' },
     ]);
+  });
+});
+
+describe('your own Related Terms', () => {
+  it('hides content with a term you add straight away, as a Strong Term', async () => {
+    await protectionState.setValue(stateWithTopics());
+    await updateProtection((state) => addTopic(state, 'Severance'));
+    const [tile, other] = await openFeed('Inside Lumon headquarters', 'Cooking pasta');
+    expect(viewItem(tile!)).toMatchObject({ state: 'shown' });
+
+    await updateProtection((state) => addUserTerm(state, 'severance', 'Lumon'));
+    await settle();
+
+    expect([viewItem(tile!), viewItem(other!)]).toEqual([
+      { title: 'Inside Lumon headquarters', state: 'covered', reason: 'Severance' },
+      { title: 'Cooking pasta', state: 'shown' },
+    ]);
+  });
+
+  it('hides with a term marked as a common word only alongside another term of its topic', async () => {
+    await protectionState.setValue(stateWithTopics());
+    await updateProtection((state) => addTopic(state, 'Severance'));
+    await updateProtection((state) => addUserTerm(state, 'severance', 'Mark', { commonWord: true }));
+    await updateProtection((state) => addUserTerm(state, 'severance', 'Milchick', { commonWord: true }));
+    const tiles = await openFeed('Mark Rober builds a dam', 'Mark confronts Milchick');
+
+    expect(tiles.map(viewItem)).toEqual([
+      { title: 'Mark Rober builds a dam', state: 'shown' },
+      { title: 'Mark confronts Milchick', state: 'covered', reason: 'Severance' },
+    ]);
+  });
+
+  it('hides on its own again once a common word is marked as not common', async () => {
+    await protectionState.setValue(stateWithTopics());
+    await updateProtection((state) => addTopic(state, 'Severance'));
+    await updateProtection((state) => addUserTerm(state, 'severance', 'Lumon', { commonWord: true }));
+    const [tile] = await openFeed('Inside Lumon headquarters');
+    expect(viewItem(tile!)).toMatchObject({ state: 'shown' });
+
+    await updateProtection((state) => setUserTermCommonWord(state, 'severance', 'Lumon', false));
+    await settle();
+
+    expect(viewItem(tile!)).toMatchObject({ state: 'covered', reason: 'Severance' });
+  });
+
+  it('shows content again when you remove your term', async () => {
+    await protectionState.setValue(stateWithTopics());
+    await updateProtection((state) => addTopic(state, 'Severance'));
+    await updateProtection((state) => addUserTerm(state, 'severance', 'Lumon'));
+    const [tile] = await openFeed('Inside Lumon headquarters');
+    expect(viewItem(tile!)).toMatchObject({ state: 'covered', reason: 'Severance' });
+
+    await updateProtection((state) => removeUserTerm(state, 'severance', 'Lumon'));
+    await settle();
+
+    expect(viewItem(tile!)).toMatchObject({ state: 'shown' });
+  });
+
+  it('keeps hiding with the AI’s copy of a term when you remove your own copy of it', async () => {
+    const [tile] = await openFeed('Every Leonida county ranked');
+    await updateProtection((state) => addUserTerm(state, GTA6_PRESET.id, 'leonida'));
+
+    await updateProtection((state) => removeUserTerm(state, GTA6_PRESET.id, 'leonida'));
+    await settle();
+
+    expect(viewItem(tile!)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
   });
 });
 

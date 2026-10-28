@@ -37,6 +37,17 @@ export interface SiteAdapter {
   pageSubject(doc: Document): PageSubject | null;
   /** Attributes whose changes can change an item or the page subject. */
   observedAttributes: string[];
+  /**
+   * Guards site interactions that can show a Hidden Item's content without
+   * touching the item, such as keyboard shortcuts. Returns a function that stops it.
+   */
+  protectInteractions?(context: SiteGuardContext): () => void;
+}
+
+export interface SiteGuardContext {
+  win: Window & typeof globalThis;
+  /** Whether the item `element` belongs to has passed its check or been revealed. */
+  isShown(element: Element): boolean;
 }
 
 export interface PageSubject {

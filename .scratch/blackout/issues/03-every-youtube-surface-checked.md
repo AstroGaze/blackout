@@ -25,3 +25,7 @@ Implemented. Checked in headless Brave against live YouTube: search results, the
 - The content script now runs in all YouTube frames so it reaches live chat. That includes YouTube embeds on other sites.
 - Known gap: a covered or still-unchecked Short keeps playing its sound. Spoken spoilers can get through until it is paused. Not addressed here.
 - The video's own title and description on a watch page are left for ticket 04 (full-page cover).
+- Follow-up fixes (on the ticket 04 branch):
+  - **Hover preview.** YouTube's hover preview player is now a mirrored item: it stays covered while the tile or Short it shows is.
+  - **Presses on the cover.** Presses on a cover never reach YouTube, so a covered search suggestion can't run its search.
+  - **Arrow keys.** They step past covered suggestions, so the search box never ends up showing one. Within a single press, YouTube still sets the box to a covered suggestion for an instant while Blackout steps past it; nothing is drawn in between.

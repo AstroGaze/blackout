@@ -41,6 +41,42 @@ async function hoverPreview(short: Element, title: string): Promise<Element> {
   return preview;
 }
 
+/**
+ * The snapshot has no YouTube scripts, so this does what YouTube does with arrow
+ * keys in the search box, as seen in Brave: it moves to the next or previous
+ * suggestion, wrapping around to what was typed, and puts it in the box at
+ * once. It only moves the highlight onto that suggestion a moment later.
+ */
+function withYouTubeArrowKeys(): HTMLInputElement {
+  const searchBox = document.querySelector<HTMLInputElement>('input[name="search_query"]')!;
+  const typed = 'gta ';
+  searchBox.value = typed;
+  let current = -1;
+  searchBox.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const rows = Array.from(document.querySelectorAll('.ytSuggestionComponentSuggestion'));
+    const positions = rows.length + 1; // every suggestion, plus what was typed
+    current = ((current + 1 + (event.key === 'ArrowDown' ? 1 : -1) + positions) % positions) - 1;
+    searchBox.value = current === -1 ? typed : rows[current]!.querySelector('[role="option"]')!.textContent!.trim();
+    const highlighted = current;
+    queueMicrotask(() =>
+      rows.forEach((row, index) => row.classList.toggle('ytSuggestionComponentHighlighted', index === highlighted)),
+    );
+  });
+  return searchBox;
+}
+
+/** Presses `key` in the search box `times` times, returning what it shows after each. */
+async function pressRepeatedly(searchBox: HTMLInputElement, key: string, times: number): Promise<string[]> {
+  const seen: string[] = [];
+  for (let press = 0; press < times; press++) {
+    searchBox.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    await settle();
+    seen.push(searchBox.value);
+  }
+  return seen;
+}
+
 /** The button inside an item's cover whose text is `name`. */
 function coverButton(item: Element, name: string): HTMLButtonElement {
   const button = Array.from(
@@ -156,6 +192,26 @@ describe('YouTube search for "gta" with the ready-made GTA 6 topic', () => {
     // Pressing doesn't move focus off the search box, which would close the suggestions.
     expect(presses.find((press) => press.type === 'mousedown')!.defaultPrevented).toBe(true);
     expect(() => coverButton(suggestion, 'Show')).not.toThrow();
+  });
+
+  describe('moving through the suggestions with the arrow keys', () => {
+    const SHOWN = ['gta 5', 'gta 5 trailer', 'gta 4', 'gta online', 'gta v', 'gta 5 online', 'gta san andreas'];
+
+    it('skips covered suggestions going down, back to what was typed', async () => {
+      const searchBox = withYouTubeArrowKeys();
+
+      const seen = await pressRepeatedly(searchBox, 'ArrowDown', SHOWN.length + 1);
+
+      expect(seen).toEqual([...SHOWN, 'gta ']);
+    });
+
+    it('skips covered suggestions going up', async () => {
+      const searchBox = withYouTubeArrowKeys();
+
+      const seen = await pressRepeatedly(searchBox, 'ArrowUp', SHOWN.length + 1);
+
+      expect(seen).toEqual([...SHOWN].reverse().concat('gta '));
+    });
   });
 
   it('covers the Shorts in the results shelf that are about GTA 6', () => {

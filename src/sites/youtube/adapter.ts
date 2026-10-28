@@ -1,4 +1,5 @@
 import { readText, type ItemKind, type SiteAdapter } from '../adapter';
+import { skipCoveredSuggestions } from './suggestion-keys';
 
 const card = (selector: string): ItemKind => ({ selector, cover: 'card' });
 const inline = (selector: string): ItemKind => ({ selector, cover: 'inline' });
@@ -39,6 +40,7 @@ export const youtube: SiteAdapter = {
   ],
   // YouTube marks the watch page metadata with its video once it has loaded.
   observedAttributes: ['video-id'],
+  protectInteractions: skipCoveredSuggestions,
   itemText: readText,
   itemKey(item) {
     // Links may be relative or absolute, and an item can be a link itself.

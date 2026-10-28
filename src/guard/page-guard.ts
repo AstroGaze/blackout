@@ -244,6 +244,14 @@ export function startPageGuard(
   });
   for (const element of doc.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
 
+  const stopProtectingInteractions = adapter.protectInteractions?.({
+    win,
+    isShown: (element) => {
+      const item = itemOf(element);
+      return item !== null && isShown(item);
+    },
+  });
+
   let stopped = false;
   protectionState
     .getValue()
@@ -264,6 +272,7 @@ export function startPageGuard(
       stopped = true;
       observer.disconnect();
       doc.removeEventListener('play', pauseIfHidden, true);
+      stopProtectingInteractions?.();
       page.stop();
       sharing.stop();
       inherited.stop();

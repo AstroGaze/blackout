@@ -44,6 +44,14 @@ function setContentInert(item: Element, inert: boolean) {
   }
 }
 
+function isHovered(element: Element): boolean {
+  try {
+    return element.matches(':hover');
+  } catch {
+    return false;
+  }
+}
+
 function isShown(item: Element) {
   const state = item.getAttribute(STATE_ATTRIBUTE);
   return state === 'clean' || state === 'revealed';
@@ -110,9 +118,13 @@ export function startPageGuard(
    * show what the user revealed. Returns false when its own check should decide.
    */
   const checkMirror = (mirror: Element, key: string): boolean => {
-    const sources = Array.from(doc.querySelectorAll(selector)).filter(
+    const copies = Array.from(doc.querySelectorAll(selector)).filter(
       (item) => item !== mirror && !isMirror(item) && itemOf(item) === item && adapter.itemKey(item) === key,
     );
+    // The same video can appear twice, covered for different topics; a preview
+    // shows the one under the pointer.
+    const hovered = copies.filter((item) => isHovered(item));
+    const sources = hovered.length > 0 ? hovered : copies;
     if (sources.some((source) => source.getAttribute(STATE_ATTRIBUTE) === 'revealed')) {
       show(mirror, 'revealed');
       return true;
@@ -199,6 +211,8 @@ export function startPageGuard(
     mountCover(item, {
       layout: coverLayoutOf(item),
       reason: coverReason(reason),
+      // A preview lies over its tile, and nothing of the tile may show through it.
+      opaque: isMirror(item),
       onReveal: () => {
         revealedKeys.set(item, key);
         show(item, 'revealed');

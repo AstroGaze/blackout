@@ -1,6 +1,7 @@
 import { Ban, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { HideReason } from '@/matcher/matcher';
 
 /** How a cover is laid out: a card over tiles, a single row over lines of text. */
@@ -16,6 +17,8 @@ export function coverReason(reason: HideReason): CoverReason {
 export interface CoverProps {
   layout: CoverLayout;
   reason: CoverReason;
+  /** Hides everything behind the cover, as over a preview lying on top of its tile. */
+  opaque?: boolean;
   onReveal: () => void;
   /** Blocks the item's source, when the site shows it. */
   onBlockSource?: () => void;
@@ -24,7 +27,7 @@ export interface CoverProps {
 }
 
 /** The blur label over a Hidden Item, with a reveal that needs confirming. */
-export function Cover({ layout, reason, onReveal, onBlockSource, onUnblock }: CoverProps) {
+export function Cover({ layout, reason, opaque = false, onReveal, onBlockSource, onUnblock }: CoverProps) {
   const [confirming, setConfirming] = useState(false);
   const blocked = 'sourceName' in reason;
   const name = blocked ? 'Blocked Source' : reason.topicName;
@@ -95,7 +98,10 @@ export function Cover({ layout, reason, onReveal, onBlockSource, onUnblock }: Co
     <div
       role="group"
       aria-label={label}
-      className="dark flex size-full flex-col items-center justify-center gap-3 rounded-xl bg-background/75 p-4 text-center text-foreground"
+      className={cn(
+        'dark flex size-full flex-col items-center justify-center gap-3 rounded-xl p-4 text-center text-foreground',
+        opaque ? 'bg-background' : 'bg-background/75',
+      )}
     >
       <Icon className="size-5 text-muted-foreground" aria-hidden />
       <div className="space-y-0.5">

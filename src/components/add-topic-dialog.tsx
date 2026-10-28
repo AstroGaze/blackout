@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { normalize } from '@/matcher/matcher';
 import type { ProtectedTopic } from '@/protection/state';
-import { addTopic, TopicNameError, updateProtection } from '@/protection/topics';
+import { TriangleAlert } from 'lucide-react';
+import { addTopic, TopicNameError, topicNameWarning, updateProtection } from '@/protection/topics';
 
 interface AddTopicDialogProps {
   open: boolean;
@@ -29,9 +30,15 @@ export function AddTopicDialog({ open, onOpenChange, onAdded, children }: AddTop
   const inputId = useId();
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** A warning about the name as typed, shown once before adding it anyway. */
+  const [warning, setWarning] = useState<string | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (warning === null) {
+      const nameWarning = topicNameWarning(name);
+      if (nameWarning) return setWarning(nameWarning);
+    }
     let added: ProtectedTopic;
     try {
       const next = await updateProtection((state) => addTopic(state, name));
@@ -43,6 +50,7 @@ export function AddTopicDialog({ open, onOpenChange, onAdded, children }: AddTop
     onAdded?.(added);
     setName('');
     setError(null);
+    setWarning(null);
     onOpenChange(false);
   };
 
@@ -50,7 +58,10 @@ export function AddTopicDialog({ open, onOpenChange, onAdded, children }: AddTop
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError(null);
+        if (!next) {
+          setError(null);
+          setWarning(null);
+        }
         onOpenChange(next);
       }}
     >
@@ -69,21 +80,34 @@ export function AddTopicDialog({ open, onOpenChange, onAdded, children }: AddTop
             <Input
               id={inputId}
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setWarning(null);
+              }}
               placeholder="Severance"
               autoFocus
               autoComplete="off"
               aria-invalid={error !== null}
-              aria-describedby={error ? `${inputId}-error` : undefined}
+              aria-describedby={error ? `${inputId}-error` : warning ? `${inputId}-warning` : undefined}
             />
             {error && (
               <p id={`${inputId}-error`} className="text-destructive text-sm">
                 {error}
               </p>
             )}
+            {warning && (
+              <div
+                id={`${inputId}-warning`}
+                role="alert"
+                className="bg-card grid grid-cols-[16px_minmax(0,1fr)] gap-x-3 rounded-lg border p-3 text-sm"
+              >
+                <TriangleAlert className="mt-0.5 size-4 text-[#FFB020]" aria-hidden />
+                <p className="text-muted-foreground leading-snug">{warning}</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button type="submit">Protect it</Button>
+            <Button type="submit">{warning ? 'Add anyway' : 'Protect it'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

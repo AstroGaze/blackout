@@ -1,4 +1,5 @@
 import { normalize } from '@/matcher/matcher';
+import { COMMON_WORDS_BY_LANGUAGE } from './common-words';
 import { isPaused, protectionState, type ProtectedTopic, type ProtectionState } from './state';
 
 const MINUTE = 60 * 1000;
@@ -16,6 +17,34 @@ export type TopicStatus = 'on' | 'paused' | 'off';
 export function topicStatus(topic: ProtectedTopic, now = Date.now()): TopicStatus {
   if (topic.enabled === false) return 'off';
   return isPaused(topic, now) ? 'paused' : 'on';
+}
+
+let commonWords: ReadonlySet<string> | null = null;
+
+function isCommonWord(word: string): boolean {
+  commonWords ??= new Set(COMMON_WORDS_BY_LANGUAGE.flatMap((list) => list.split(' ').map(normalize)));
+  return commonWords.has(word);
+}
+
+/**
+ * A topic's name protects on its own as a Strong Term, so a name that is a single
+ * everyday word, a very short word or a plain number hides far more than the topic.
+ * Returns a warning worded for the person typing it, or null when the name is
+ * specific enough.
+ */
+export function topicNameWarning(name: string): string | null {
+  const words = normalize(name).split(' ').filter(Boolean);
+  if (words.length !== 1) return null;
+  const word = words[0]!;
+  const shown = name.trim();
+  const fuller = 'A fuller name, such as its complete title, hides less.';
+  if (isCommonWord(word)) {
+    return `“${shown}” is an everyday word, so Blackout will hide anything that uses it, not just ${shown}. ${fuller}`;
+  }
+  if (word.length <= 2 || /^\d+$/.test(word)) {
+    return `“${shown}” is very short, so Blackout will hide anything that contains it as a word, not just ${shown}. ${fuller}`;
+  }
+  return null;
 }
 
 /** Why a name can't become a Protected Topic, worded for the person typing it. */

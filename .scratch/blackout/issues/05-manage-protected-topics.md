@@ -29,4 +29,4 @@ Notes:
 - Continuing past a full-page cover lasts for that page view, even if the topic is turned off and on or a Pause ends meanwhile. Revealed items work the same way.
 - While the stored protection state can't be read, every item stays hidden and a watch page shows the "couldn't check" cover. Once the state is readable again, everything is checked again.
 - Settings shows how many Related Terms a topic has per Spoiler Level, never the terms themselves. That matches the design; ticket 07 adds the viewer.
-- **Open product question:** a topic named with a very common word ("It", "Up", "Control") hides almost everything that uses the word, because the name is a Strong Term. Decide whether to warn, or let the user mark the name as a common word.
+- Common-word names: adding a topic whose name is a single everyday word (top 5,000 in English or Spanish), two characters or less, or only a number shows a warning in the Add topic dialog, with "Add anyway". The word lists come from hermitdave/FrequencyWords (CC BY-SA 4.0); the generated src/protection/common-words.ts carries the credit and license, and scripts/build-common-words.mjs rebuilds it.

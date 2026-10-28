@@ -24,7 +24,16 @@ export interface ProtectedTopic {
   /** Epoch ms when a Pause ends, or null when not paused. */
   pausedUntil: number | null;
   sources: { wiki: string | null; subreddit: string | null };
-  lastRefresh: { at: number; ok: boolean; error?: string } | null;
+  /**
+   * The last time Related Terms were built: how many it added and which sources
+   * it could read, or why it failed.
+   */
+  lastRefresh:
+    | { at: number; ok: true; added: number; sourcesRead: string[] }
+    | { at: number; ok: false; error: string }
+    | null;
+  /** Epoch ms when a refresh began, while it runs or if it never finished. */
+  refreshingSince?: number;
   terms: RelatedTerm[];
 }
 

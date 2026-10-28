@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { CircleAlert, LoaderCircle, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { Logo } from '@/components/logo';
@@ -20,9 +20,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatTimeLeft } from '@/lib/format';
+import { formatTimeLeft, formatWhen } from '@/lib/format';
 import { useNow, useProtectionState } from '@/lib/use-protection';
 import { GTA6_PRESET, type ProtectedTopic } from '@/protection/state';
+import { isRefreshing } from '@/refresh/refresh';
 import {
   aiTermsByLevel,
   deleteTopic,
@@ -121,7 +122,7 @@ export function App() {
             </div>
             {state.topics.map((topic) => (
               <TabsContent key={topic.id} value={topic.id} className="flex flex-col gap-6">
-                <TopicPanel topic={topic} now={now} />
+                <TopicPanel topic={topic} now={now} modelConnected={state.modelConnection !== null} />
               </TabsContent>
             ))}
           </Tabs>
@@ -131,7 +132,15 @@ export function App() {
   );
 }
 
-function TopicPanel({ topic, now }: { topic: ProtectedTopic; now: number }) {
+function TopicPanel({
+  topic,
+  now,
+  modelConnected,
+}: {
+  topic: ProtectedTopic;
+  now: number;
+  modelConnected: boolean;
+}) {
   const status = topicStatus(topic, now);
 
   return (
@@ -196,7 +205,7 @@ function TopicPanel({ topic, now }: { topic: ProtectedTopic; now: number }) {
         </div>
       </div>
 
-      <RelatedTermsSummary topic={topic} />
+      <RelatedTermsSummary topic={topic} now={now} modelConnected={modelConnected} />
       <UserTerms topic={topic} />
     </>
   );
@@ -206,7 +215,15 @@ function TopicPanel({ topic, now }: { topic: ProtectedTopic; now: number }) {
  * How many Related Terms the topic has per Spoiler Level, with the terms themselves
  * behind the term viewer.
  */
-function RelatedTermsSummary({ topic }: { topic: ProtectedTopic }) {
+function RelatedTermsSummary({
+  topic,
+  now,
+  modelConnected,
+}: {
+  topic: ProtectedTopic;
+  now: number;
+  modelConnected: boolean;
+}) {
   const levels = aiTermsByLevel(topic);
   const hasGeneratedTerms = SPOILER_LEVELS.some((level) => levels[level].length > 0);
   const andYours = userTerms(topic).length > 0 ? ', and by your own terms' : '';
@@ -219,6 +236,7 @@ function RelatedTermsSummary({ topic }: { topic: ProtectedTopic }) {
             ? 'Hidden to protect you.'
             : `None yet. ${topic.name} is protected by its name, including its spacing and hashtag variants${andYours}.`}
         </p>
+        <RefreshStatus topic={topic} now={now} modelConnected={modelConnected} />
       </div>
       {hasGeneratedTerms && (
         <>
@@ -240,4 +258,55 @@ function RelatedTermsSummary({ topic }: { topic: ProtectedTopic }) {
       )}
     </section>
   );
+}
+
+/** Whether the AI model is building the topic's terms, and how the last time went. */
+function RefreshStatus({ topic, now, modelConnected }: { topic: ProtectedTopic; now: number; modelConnected: boolean }) {
+  const { lastRefresh } = topic;
+  if (isRefreshing(topic, now)) {
+    return (
+      <p role="status" className="text-muted-foreground inline-flex items-center gap-1.5 text-[13px]">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden />
+        Building Related Terms with your AI model…
+      </p>
+    );
+  }
+  if (typeof topic.refreshingSince === 'number') {
+    return (
+      <p role="status" className="text-destructive inline-flex items-start gap-1.5 text-[13px]">
+        <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+        Building Related Terms {formatWhen(topic.refreshingSince, now)} didn’t finish. The existing terms are kept.
+      </p>
+    );
+  }
+  if (lastRefresh && !lastRefresh.ok) {
+    return (
+      <p role="status" className="text-destructive inline-flex items-start gap-1.5 text-[13px]">
+        <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+        Couldn’t build Related Terms {formatWhen(lastRefresh.at, now)}. {lastRefresh.error}
+      </p>
+    );
+  }
+  if (lastRefresh) {
+    const { added, sourcesRead: sources } = lastRefresh;
+    return (
+      <p className="text-muted-foreground text-[13px]">
+        Built by your AI model {formatWhen(lastRefresh.at, now)} · {added} {added === 1 ? 'term' : 'terms'} added
+        {sources.length > 0
+          ? ` · from ${sources.join(', ')}`
+          : ' · from its name only, as no background material could be read'}
+      </p>
+    );
+  }
+  if (!modelConnected) {
+    return (
+      <p className="text-muted-foreground text-[13px]">
+        <a href="#model" className="text-foreground font-medium underline underline-offset-4">
+          Connect an AI model
+        </a>{' '}
+        to have Blackout find characters, places and other names for new topics.
+      </p>
+    );
+  }
+  return null;
 }

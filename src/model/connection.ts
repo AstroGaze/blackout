@@ -44,8 +44,8 @@ export function presetFor(connection: ModelConnection): ModelPreset {
 
 export type ConnectionResult = { ok: true; replyMs: number } | { ok: false; message: string };
 
-/** Why a model connection didn't work, worded for the person connecting it. */
-class ConnectionError extends Error {}
+/** Why the model couldn't be reached or answered badly, worded for the person using it. */
+export class ConnectionError extends Error {}
 
 /**
  * Connects the model: asks for access to the server's address, checks that the
@@ -132,15 +132,17 @@ function isOllama(baseUrl: string): boolean {
   return port === '11434' && (hostname === 'localhost' || hostname === '127.0.0.1');
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-const TIMEOUT_MS = 60_000;
-
 /** Sends a chat-completions request and returns the reply's text. */
-async function chatCompletion(connection: ModelConnection, messages: ChatMessage[]): Promise<string> {
+export async function chatCompletion(
+  connection: ModelConnection,
+  messages: ChatMessage[],
+  { timeoutMs = 60_000 } = {},
+): Promise<string> {
   const host = hostOf(connection);
   const headers = new Headers({ 'content-type': 'application/json' });
   if (connection.apiKey) headers.set('authorization', `Bearer ${connection.apiKey}`);
@@ -151,11 +153,11 @@ async function chatCompletion(connection: ModelConnection, messages: ChatMessage
       method: 'POST',
       headers,
       body: JSON.stringify({ model: connection.model, messages }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (failure) {
     if (failure instanceof DOMException && failure.name === 'TimeoutError') {
-      throw new ConnectionError(`${host} took longer than a minute to answer.`);
+      throw new ConnectionError(`${host} took too long to answer.`);
     }
     if (isOllama(connection.baseUrl)) {
       throw new ConnectionError('Couldn’t reach Ollama. Is it running on this computer?');

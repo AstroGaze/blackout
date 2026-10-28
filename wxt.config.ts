@@ -9,6 +9,8 @@ export default defineConfig({
     name: 'Blackout',
     description: "Hides spoilers for the media you haven't finished yet.",
     permissions: ['storage'],
+    // Background material for building Related Terms (spec: Permissions).
+    host_permissions: ['https://*.wikipedia.org/*'],
     // The AI model's server, asked for when the user connects it (spec: Permissions).
     optional_host_permissions: ['https://*/*', 'http://*/*'],
   },

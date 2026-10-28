@@ -64,7 +64,7 @@ export function userTermHint(text: string, topicName: string): string | null {
 }
 
 /** Whether `text` is a single word that, on its own, hides far more than one topic. */
-function broadWordKind(text: string): 'everyday' | 'short' | null {
+export function broadWordKind(text: string): 'everyday' | 'short' | null {
   const words = normalize(text).split(' ').filter(Boolean);
   if (words.length !== 1) return null;
   const word = words[0]!;
@@ -106,7 +106,7 @@ function uniqueId(state: ProtectionState, name: string): string {
   return id;
 }
 
-function changeTopic(
+export function changeTopic(
   state: ProtectionState,
   id: string,
   change: (topic: ProtectedTopic) => ProtectedTopic,
@@ -161,14 +161,17 @@ export function aiTermsByLevel(topic: ProtectedTopic): Record<SpoilerLevel, Rela
   return levels;
 }
 
-/** A term's run-together form: the matcher reads "#Lumon" and "Lu mon" as "Lumon" too. */
-function joinedForm(text: string): string {
-  return normalize(text).replaceAll(' ', '');
+/**
+ * Whether two terms are the same as the matcher reads them: "#Lumon" and "LUMON"
+ * are, but "Coldharbor" and "Cold Harbor" match different text, so they aren't.
+ */
+export function sameTerm(a: string, b: string): boolean {
+  return normalize(a) === normalize(b);
 }
 
 /** Whether `term` is the user's own copy of `text`, compared as the matcher reads it. */
 function isUserTerm(term: RelatedTerm, text: string): boolean {
-  return term.addedBy === 'user' && joinedForm(term.text) === joinedForm(text);
+  return term.addedBy === 'user' && sameTerm(term.text, text);
 }
 
 /**
@@ -184,7 +187,7 @@ export function addUserTerm(
   const trimmed = text.trim();
   if (normalize(trimmed) === '') throw new TermTextError('Type a word or phrase to hide.');
   return changeTopic(state, topicId, (topic) => {
-    if (joinedForm(topic.name) === joinedForm(trimmed)) {
+    if (sameTerm(topic.name, trimmed)) {
       throw new TermTextError(`${topic.name} is already protected by its name.`);
     }
     const existing = topic.terms.find((term) => isUserTerm(term, trimmed));
@@ -216,14 +219,25 @@ let pendingChanges: Promise<unknown> = Promise.resolve();
 
 /**
  * Reads the protection state, changes it and stores it; open pages react to the
- * change. Returns the new state.
+ * change. Returns the new state. Changes run one at a time across the settings
+ * page, the popup and the background, so none overwrites another.
  */
 export function updateProtection(
   change: (state: ProtectionState) => ProtectionState,
 ): Promise<ProtectionState> {
-  const update = pendingChanges.then(async () => {
+  const write = async () => {
     const next = change(await protectionState.getValue());
     await protectionState.setValue(next);
+    return next;
+  };
+  const update = pendingChanges.then(async () => {
+    // A lock the extension's pages and its service worker all share, held until the write is done.
+    const locks = globalThis.navigator?.locks;
+    if (!locks) return write();
+    let next!: ProtectionState;
+    await locks.request('blackout-protection-state', async () => {
+      next = await write();
+    });
     return next;
   });
   pendingChanges = update.catch(() => {});

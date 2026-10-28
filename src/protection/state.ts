@@ -23,7 +23,12 @@ export interface ProtectedTopic {
   enabled: boolean;
   /** Epoch ms when a Pause ends, or null when not paused. */
   pausedUntil: number | null;
-  sources: { wiki: string | null; subreddit: string | null };
+  /**
+   * Where the topic is read about: its Fandom wiki page, its subreddit (not read
+   * in v1: Reddit closed its free API), and its Wikipedia article's title, which
+   * is null when none was found and missing until the first refresh.
+   */
+  sources: { wiki: string | null; subreddit: string | null; wikipedia?: string | null };
   /**
    * The last time Related Terms were built: how many it added and which sources
    * it could read, or why it failed.

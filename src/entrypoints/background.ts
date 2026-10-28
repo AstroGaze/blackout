@@ -1,5 +1,5 @@
-import { watchForNewTopics } from '@/refresh/refresh';
+import { startBackgroundRefresh } from '@/refresh/schedule';
 
 export default defineBackground(() => {
-  watchForNewTopics();
+  startBackgroundRefresh();
 });

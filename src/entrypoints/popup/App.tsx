@@ -1,4 +1,4 @@
-import { Pause, Plus } from 'lucide-react';
+import { Pause, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { Logo } from '@/components/logo';
@@ -6,10 +6,12 @@ import { PauseMenu } from '@/components/pause-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { formatTimeLeft } from '@/lib/format';
+import { formatAgo, formatTimeLeft } from '@/lib/format';
 import { useNow, useProtectionState } from '@/lib/use-protection';
 import type { ProtectedTopic } from '@/protection/state';
 import { resumeTopic, setTopicEnabled, topicStatus, updateProtection } from '@/protection/topics';
+import { isRefreshing } from '@/refresh/refresh';
+import { requestRefresh } from '@/refresh/schedule';
 
 export function App() {
   const state = useProtectionState();
@@ -37,7 +39,9 @@ export function App() {
             spoilers for.
           </p>
         ) : (
-          state.topics.map((topic) => <TopicCard key={topic.id} topic={topic} now={now} />)
+          state.topics.map((topic) => (
+            <TopicCard key={topic.id} topic={topic} now={now} modelConnected={state.modelConnection !== null} />
+          ))
         )}
       </main>
 
@@ -56,7 +60,7 @@ export function App() {
   );
 }
 
-function TopicCard({ topic, now }: { topic: ProtectedTopic; now: number }) {
+function TopicCard({ topic, now, modelConnected }: { topic: ProtectedTopic; now: number; modelConnected: boolean }) {
   const status = topicStatus(topic, now);
 
   if (status === 'paused') {
@@ -69,6 +73,7 @@ function TopicCard({ topic, now }: { topic: ProtectedTopic; now: number }) {
           </div>
           <span className="text-muted-foreground text-[13px]">
             Back on in {formatTimeLeft(topic.pausedUntil!, now)}
+            {refreshSummary(topic, now) && ` · ${refreshSummary(topic, now)}`}
           </span>
         </div>
         <Button variant="outline" size="sm" onClick={() => updateProtection((state) => resumeTopic(state, topic.id))}>
@@ -84,7 +89,7 @@ function TopicCard({ topic, now }: { topic: ProtectedTopic; now: number }) {
         <div className="flex flex-col gap-1">
           <h2 className="leading-none font-semibold">{topic.name}</h2>
           <span className="text-muted-foreground text-[13px]">
-            {status === 'off' ? 'Off · not protecting' : termSummary(topic)}
+            {status === 'off' ? 'Off · not protecting' : termSummary(topic, now)}
           </span>
         </div>
         <Switch
@@ -101,12 +106,35 @@ function TopicCard({ topic, now }: { topic: ProtectedTopic; now: number }) {
               Pause
             </Button>
           </PauseMenu>
+          {modelConnected && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="grow"
+              disabled={isRefreshing(topic, now)}
+              onClick={() => void requestRefresh(topic.id)}
+            >
+              <RefreshCw className={isRefreshing(topic, now) ? 'animate-spin' : undefined} />
+              Refresh
+            </Button>
+          )}
         </div>
       )}
     </section>
   );
 }
 
-function termSummary(topic: ProtectedTopic): string {
-  return topic.terms.length === 0 ? 'Protected by its name' : `${topic.terms.length} terms`;
+/** "214 terms · refreshed 6 h ago": what protects the topic, and how current it is. */
+function termSummary(topic: ProtectedTopic, now: number): string {
+  const terms = topic.terms.length === 0 ? 'Protected by its name' : `${topic.terms.length} terms`;
+  const refresh = refreshSummary(topic, now);
+  return refresh ? `${terms} · ${refresh}` : terms;
+}
+
+/** "refreshed 6 h ago", "refresh failed 2 h ago" or "refreshing…"; null before the first refresh. */
+function refreshSummary(topic: ProtectedTopic, now: number): string | null {
+  if (isRefreshing(topic, now)) return 'refreshing…';
+  const { lastRefresh } = topic;
+  if (!lastRefresh) return null;
+  return lastRefresh.ok ? `refreshed ${formatAgo(lastRefresh.at, now)}` : `refresh failed ${formatAgo(lastRefresh.at, now)}`;
 }

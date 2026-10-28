@@ -15,3 +15,13 @@ export function formatWhen(at: number, now: number): string {
   if (day(at) === day(now - 24 * 60 * 60 * 1000)) return `yesterday ${time}`;
   return `${new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
 }
+
+/** "just now", "12 min ago", "6 h ago" or "3 d ago": how long ago `at` was. */
+export function formatAgo(at: number, now: number): string {
+  const minutes = Math.floor((now - at) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.floor(hours / 24)} d ago`;
+}

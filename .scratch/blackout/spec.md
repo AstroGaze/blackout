@@ -51,10 +51,10 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
 ### Refresh
 
 25. As a user, I want each active Protected Topic's term list refreshed once a day, so that characters and events revealed after release are added automatically.
-26. As a user, I want Blackout to read the topic's Wikipedia page, Fandom wiki and subreddit in the background for me, so that the term list is current without me seeing any of that material.
-27. As a user, I want the subreddit's newest and top-of-day posts to be the most important source, so that launch-day revelations are caught as early as possible.
-28. As a user, I want the AI to suggest the right wiki and subreddit when I add a topic, so that I don't have to find them myself.
-29. As a user, I want to see and correct which wiki and subreddit a topic uses, so that a wrong suggestion doesn't weaken protection.
+26. As a user, I want Blackout to read the topic's Wikipedia page and Fandom wiki in the background for me, so that the term list is current without me seeing any of that material.
+27. As a user, I want the Fandom wiki, including the pages its community added most recently, to be the most important source, so that launch-day revelations are caught as early as possible. (The subreddit was the plan, but Reddit closed its free API in 2026; see After v1.)
+28. As a user, I want the AI to suggest the right Fandom wiki and Wikipedia article when I add a topic, so that I don't have to find them myself.
+29. As a user, I want to see and correct which Fandom wiki and Wikipedia article a topic uses, so that a wrong suggestion doesn't weaken protection.
 30. As a user, I want a refresh to only add terms, never remove them, so that protection can't quietly get weaker.
 31. As a user, I want a "refresh now" button, so that I can update a topic right before a risky moment like launch day.
 32. As a user, I want to see when a topic was last refreshed and whether it failed, so that I know how current my protection is.
@@ -111,7 +111,7 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
 **Modules**
 
 - **Protection state**: the single source of truth stored in extension local storage (never synced). It holds:
-  - Protected Topics: name, on/off, Pause end time, chosen wiki and subreddit, last refresh time and outcome.
+  - Protected Topics: name, on/off, Pause end time, chosen Fandom wiki and Wikipedia article (and a subreddit, kept for later), last refresh time and outcome.
   - Each topic's Related Terms: text, Spoiler Level, Strong or Weak, language, and whether the AI or the user added it.
   - Blocked Sources: site plus account identity.
   - Suggested Block counts.
@@ -123,7 +123,7 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
 - **Matcher**: a deep module with a small interface. It compiles active topics and Blocked Sources into a matcher once per state change. It then answers, for one item's text plus its context (source identity, the page or thread it sits in), whether to hide it and which topic or Blocked Source is the reason. Rules:
   - Matching ignores case, accents and repeated whitespace or punctuation, and respects word boundaries. Spacing and hashtag variants count, so "GTA 6", "GTA6" and "#GTA6" all match.
   - A Strong Term hides on its own.
-  - A Weak Term hides only when the same item contains another Related Term of that topic, or its context is about the topic: the page or thread is covered by the topic, or the source is the topic's own subreddit.
+  - A Weak Term hides only when the same item contains another Related Term of that topic, or its context is about the topic: the page or thread is covered by the topic, or the source is the topic's own subreddit (stored on the topic, as the GTA 6 preset has; Blackout no longer reads it, but the Reddit site ticket can still use it as context).
   - A Blocked Source hides regardless of text.
   - Paused or switched-off topics are ignored.
 - **Site adapters** (YouTube, Reddit, X): one per site, all with the same shape. Each knows:
@@ -143,12 +143,12 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
 - **Suggested Block tracker**: counts Hidden Items per source per active topic and day. At 3, it offers a Suggested Block in the page and the popup. Nothing is added to Blocked Sources without the user's click.
 - **Refresh** (background service worker):
   - **When it runs:** when a topic is added, daily via an alarm for every active topic, and on "refresh now".
-  - **Collecting material:** gathers background material from the topic's Wikipedia page, its Fandom wiki and its subreddit's newest and top-of-day posts with top comments. Reddit is weighted most, and the material is trimmed to fit the model's context.
+  - **Collecting material:** gathers background material from the topic's Wikipedia page and its Fandom wiki: the topic's page, led by the titles of pages the wiki's community added recently. Fandom is weighted most: when the material must be trimmed to fit the model's context, Wikipedia is trimmed first, and Fandom takes up to three quarters of the room. Reading the subreddit was the plan, but Reddit closed its free API in 2026 (unauthenticated access returns 403 since May 30, 2026, and new API apps need Reddit's approval), so it moved to After v1.
   - **Asking the model:** sends the material to the model connection and asks for Related Terms in every browsing language. Each term comes with a Spoiler Level and Strong/Weak.
   - **Merging:** results are validated and merged additively. Duplicates are compared after the same normalisation the matcher uses. User-added terms are never touched.
   - **Missing fields fail strict:** a term with no Spoiler Level becomes Major, and one with no strength becomes Strong.
   - **Failures:** invalid output is retried once. A failure keeps the existing list and records the failure on the topic.
-  - **On topic creation** the model also suggests the wiki and subreddit, which the user can correct.
+  - **On topic creation** the model also suggests the Fandom wiki and Wikipedia article, which the user can correct. A suggested wiki is kept only if it exists.
 - **Model client**: speaks the OpenAI-compatible chat-completions format and nothing else (ADR-0001). It comes with presets for:
   - DeepSeek (first),
   - OpenAI, OpenRouter, Groq, Gemini and Anthropic (each via its OpenAI-compatible endpoint),
@@ -164,7 +164,7 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
 
 **Privacy boundary** (ADR-0002): the model receives only the topic name and the collected background material. Page content never leaves the browser.
 
-**Permissions**: content scripts on YouTube, Reddit and X. Background fetch access to Wikipedia, Fandom and Reddit. The model provider's address is requested optionally at connect time.
+**Permissions**: content scripts on YouTube, Reddit and X. Background fetch access to Wikipedia and Fandom. The model provider's address is requested optionally at connect time.
 
 ## Testing Decisions
 
@@ -183,14 +183,14 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
   - **Performance:** a large feed snapshot checks the 16 ms batch budget, with headroom so slower test machines don't fail it at random.
   - The matcher is tested through this seam, not on its own.
 - **Seam 2: the refresh.**
-  - **Setup:** a test runs a refresh with the network replaced by recorded responses: Wikipedia, Fandom and Reddit pages, plus model replies. The model replies include a well-formed DeepSeek-style reply, a malformed reply, a reply missing levels or strengths, a failing provider and no model connected.
+  - **Setup:** a test runs a refresh with the network replaced by recorded responses: Wikipedia and Fandom pages, plus model replies. The model replies include a well-formed DeepSeek-style reply, a malformed reply, a reply missing levels or strengths, a failing provider and no model connected.
   - **Assertions:** the resulting stored term list is checked, including:
     - additions only,
     - user terms untouched,
     - missing fields stored as Major and Strong,
     - the existing list kept on failure, with the failure recorded,
     - the no-model fallback,
-    - suggested wiki and subreddit stored on topic creation.
+    - suggested Fandom wiki and Wikipedia article stored on topic creation.
 - **Tools:** Vitest, a simulated DOM, and WXT's fake browser for storage and alarms.
 - **Not automated:** the popup and settings page, and the final behaviour in real Brave. These are checked by hand with the checklist in Further Notes.
 - **Prior art:** none. This is a new codebase, so these tests set the pattern.
@@ -208,6 +208,14 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
 - Firecrawl or any other paid source-collection service.
 - Publishing to the Chrome Web Store, plus the privacy policy and support it needs.
 - Syncing settings across devices.
+
+## After v1
+
+Planned once v1 is finished (decided 2026-10-27). None of these is part of v1.
+
+- **A research agent.** A server-side agent, likely on Cloudflare, that researches each topic itself: it searches the web, wikis, Fandom and forums with tools, then returns the categorised term list. It speaks OpenAI-compatible chat completions, so Blackout treats it as just another model. The model still never receives anything from the user's browsing (ADR-0002).
+- **Reading Reddit.** Reddit closed its free API in 2026, so v1 doesn't read subreddits. The research agent can bring Reddit back through a search provider that indexes it, or Blackout can use Reddit's official API if access is approved.
+- **A paid plan.** If Blackout gets popular, users pay for the hosted agent, and that covers the model and search costs for everyone. Bring-your-own-model stays available. Running and paying for model access ourselves reverses ADR-0001's "we never run or pay for model access ourselves", so a new ADR must replace that part when this is built. Publishing to the Chrome Web Store, with the privacy policy and support it needs, comes with it.
 
 ## Further Notes
 

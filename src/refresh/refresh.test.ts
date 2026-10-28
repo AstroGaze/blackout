@@ -3,8 +3,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { protectionState, type ModelConnection, type RelatedTerm } from '@/protection/state';
-import { addTopic, addUserTerm, updateProtection } from '@/protection/topics';
+import { addTopic, addUserTerm, changeTopic, updateProtection } from '@/protection/topics';
 import { stateWithTopics, topic } from '@/test/state';
+import fandomNewPages from './fixtures/fandom-new-pages-severance.json';
+import fandomPage from './fixtures/fandom-page-severance.json';
+import fandomSearch from './fixtures/fandom-search-severance.json';
+import fandomSiteinfo from './fixtures/fandom-siteinfo-severance.json';
 import wikipediaExtract from './fixtures/wikipedia-extract-severance.json';
 import wikipediaSearch from './fixtures/wikipedia-search-severance.json';
 import { refreshTopic, watchForNewTopics } from './refresh';
@@ -46,32 +50,72 @@ function otherArticle(title: string) {
   };
 }
 
+/** The model's suggestion of where to read about Severance. */
+const suggests = (sources: { fandom: string | null; wikipedia: string | null }) => deepseekReply(fenced(sources));
+
+/** The Severance Fandom wiki, from the recorded responses. */
+function severanceWiki(url: URL, pageText?: string): Response {
+  if (url.searchParams.get('meta') === 'siteinfo') return Response.json(fandomSiteinfo);
+  if (url.searchParams.get('list') === 'search') return Response.json(fandomSearch);
+  if (url.searchParams.get('list') === 'recentchanges') return Response.json(fandomNewPages);
+  if (url.searchParams.get('action') === 'parse') {
+    return Response.json(pageText ? { parse: { ...fandomPage.parse, wikitext: pageText } } : fandomPage);
+  }
+  return new Response('Not found', { status: 404 });
+}
+
+const isTermRequest = (body: { messages: { role: string; content: string }[] }) =>
+  body.messages[0]?.content.startsWith('You build term lists') ?? false;
+
 /**
- * Replaces the network: Wikipedia answers with `wikipediaFirst` in order, then
- * from the recorded responses (or always with `wikipedia`), and the model server
- * gives `modelReplies` in order.
+ * Replaces the network:
+ * - Wikipedia answers with `wikipediaFirst` in order, then from the recorded
+ *   responses (or always with `wikipedia`).
+ * - severance-tv.fandom.com answers from its recorded responses (or always with
+ *   `fandom`); any other Fandom wiki doesn't exist.
+ * - The model server answers a request for sources with `suggestion`, and
+ *   requests for terms with `modelReplies` in order.
  */
 function network({
   wikipedia,
   wikipediaFirst = [],
+  fandom,
+  fandomPageText,
+  beforeTerms,
+  suggestion = suggests({ fandom: 'severance-tv.fandom.com', wikipedia: null }),
   modelReplies,
 }: {
   wikipedia?: Response;
   wikipediaFirst?: Response[];
+  fandom?: Response;
+  /** Replaces the text of the wiki's Severance page. */
+  fandomPageText?: string;
+  /** Runs when the model is asked for terms, before it answers. */
+  beforeTerms?: () => Promise<unknown>;
+  suggestion?: Response;
   modelReplies: Response[];
 }) {
-  const fetch = vi.fn(async (input: string | URL, _init?: RequestInit) => {
+  const fetch = vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = new URL(String(input));
+    if (url.hostname.endsWith('.fandom.com')) {
+      if (fandom) return fandom.clone();
+      return url.hostname === 'severance-tv.fandom.com' ? severanceWiki(url, fandomPageText) : new Response('Not a wiki', { status: 404 });
+    }
     if (url.hostname.endsWith('.wikipedia.org')) {
       const next = wikipediaFirst.shift();
       if (next) return next;
       if (wikipedia) return wikipedia.clone();
       if (url.searchParams.get('list') === 'search') return Response.json(wikipediaSearch);
+      if (url.searchParams.get('titles') === 'Severance (season 9)') {
+        return Response.json({ query: { pages: [{ ns: 0, title: 'Severance (season 9)', missing: true }] } });
+      }
       return url.searchParams.get('titles') === 'Severance (TV series)'
         ? Response.json(wikipediaExtract)
         : Response.json(otherArticle(url.searchParams.get('titles') ?? ''));
     }
     if (url.hostname === 'api.deepseek.com') {
+      if (!isTermRequest(JSON.parse(String(init?.body)))) return suggestion.clone();
+      await beforeTerms?.();
       return modelReplies.shift() ?? new Response('No more replies', { status: 500 });
     }
     throw new TypeError(`Unexpected request to ${url}`);
@@ -79,11 +123,14 @@ function network({
   vi.stubGlobal('fetch', fetch);
   const wikipediaRequests = () =>
     fetch.mock.calls.filter(([input]) => new URL(String(input)).hostname.endsWith('.wikipedia.org')).length;
-  const modelRequests = () =>
+  const allModelRequests = () =>
     fetch.mock.calls
       .filter(([input]) => new URL(String(input)).hostname === 'api.deepseek.com')
       .map(([, init]) => JSON.parse(String(init?.body)) as { messages: { role: string; content: string }[] });
-  return { fetch, modelRequests, wikipediaRequests };
+  /** Requests for terms, leaving out the request for sources. */
+  const modelRequests = () => allModelRequests().filter(isTermRequest);
+  const suggestionRequests = () => allModelRequests().filter((body) => !isTermRequest(body));
+  return { fetch, modelRequests, suggestionRequests, wikipediaRequests };
 }
 
 /** A state with Severance protected by name, and a model connected unless `model` is null. */
@@ -127,10 +174,10 @@ describe('building a topic’s Related Terms', () => {
       { text: 'Ms. Casey', level: 'minor', strength: 'strong', language: 'en', addedBy: 'ai' },
       { text: 'Cold Harbor', level: 'major', strength: 'strong', language: 'en', addedBy: 'ai' },
     ]);
-    expect(stored.lastRefresh).toEqual({ at: expect.any(Number), ok: true, added: 5, sourcesRead: ['Wikipedia'] });
+    expect(stored.lastRefresh).toEqual({ at: expect.any(Number), ok: true, added: 5, sourcesRead: ['Fandom', 'Wikipedia'] });
   });
 
-  it('sends the model only the topic’s name and the Wikipedia article about it', async () => {
+  it('sends the model only the topic’s name and the material read about it', async () => {
     await severanceProtected();
     await updateProtection((state) => addUserTerm(state, 'severance', 'my own secret term'));
     const { fetch, modelRequests } = network({ modelReplies: [deepseekReply(WELL_FORMED)] });
@@ -142,7 +189,7 @@ describe('building a topic’s Related Terms', () => {
     expect(sent).toContain('Lumon Industries');
     expect(sent).not.toContain('my own secret term');
     const hosts = new Set(fetch.mock.calls.map(([input]) => new URL(String(input)).hostname));
-    expect(hosts).toEqual(new Set(['en.wikipedia.org', 'api.deepseek.com']));
+    expect(hosts).toEqual(new Set(['en.wikipedia.org', 'severance-tv.fandom.com', 'api.deepseek.com']));
   });
 
   it('tells Wikipedia who is asking, with a link to the project', async () => {
@@ -216,7 +263,7 @@ describe('building a topic’s Related Terms', () => {
     expect(JSON.stringify(modelRequests())).toContain('Severance');
     const stored = await storedTopic();
     expect(aiTerms(stored.terms)).toHaveLength(5);
-    expect(stored.lastRefresh).toMatchObject({ ok: true, sourcesRead: [] });
+    expect(stored.lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Fandom'] });
   });
 });
 
@@ -239,7 +286,7 @@ describe('when Wikipedia limits how often it can be asked', () => {
     await refreshed;
 
     expect(wikipediaRequests()).toBe(3);
-    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Wikipedia'] });
+    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Fandom', 'Wikipedia'] });
   });
 
   it('waits at least 5 seconds, then longer, when Wikipedia doesn’t say how long', async () => {
@@ -261,7 +308,7 @@ describe('when Wikipedia limits how often it can be asked', () => {
     await vi.advanceTimersByTimeAsync(200);
     await refreshed;
 
-    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Wikipedia'] });
+    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Fandom', 'Wikipedia'] });
   });
 
   it('goes on without Wikipedia rather than wait longer than a minute', async () => {
@@ -275,7 +322,7 @@ describe('when Wikipedia limits how often it can be asked', () => {
 
     expect(wikipediaRequests()).toBe(1);
     expect(modelRequests()).toHaveLength(1);
-    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: [] });
+    expect((await storedTopic()).lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Fandom'] });
   });
 
   it('doesn’t ask again for an article that doesn’t exist', async () => {
@@ -288,6 +335,207 @@ describe('when Wikipedia limits how often it can be asked', () => {
     await refreshTopic('severance');
 
     expect(wikipediaRequests()).toBe(1);
+  });
+});
+
+describe('the sources a topic is read from', () => {
+  it('asks the model for the topic’s Fandom wiki and Wikipedia article the first time, and keeps the ones that exist', async () => {
+    await severanceProtected();
+    network({
+      suggestion: suggests({ fandom: 'severance-tv.fandom.com', wikipedia: 'Severance (TV series)' }),
+      modelReplies: [deepseekReply(WELL_FORMED)],
+    });
+
+    await refreshTopic('severance');
+
+    expect((await storedTopic()).sources).toMatchObject({
+      wiki: 'https://severance-tv.fandom.com/wiki/Severance',
+      wikipedia: 'Severance (TV series)',
+    });
+  });
+
+  it('drops a suggested wiki that doesn’t exist, and still builds terms', async () => {
+    await severanceProtected();
+    network({ suggestion: suggests({ fandom: 'severance-the-show.fandom.com', wikipedia: null }), modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    const stored = await storedTopic();
+    expect(stored.sources.wiki).toBeNull();
+    expect(stored.lastRefresh).toMatchObject({ ok: true, sourcesRead: ['Wikipedia'] });
+  });
+
+  it('ignores a suggested address that isn’t a Fandom wiki', async () => {
+    await severanceProtected();
+    const { fetch } = network({ suggestion: suggests({ fandom: 'evil.example.com', wikipedia: null }), modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    expect(fetch.mock.calls.map(([input]) => new URL(String(input)).hostname)).not.toContain('evil.example.com');
+    expect((await storedTopic()).sources.wiki).toBeNull();
+  });
+
+  it('asks for sources only once, and never for a topic that has them', async () => {
+    await severanceProtected();
+    const { suggestionRequests } = network({ modelReplies: [deepseekReply(WELL_FORMED), deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+    await refreshTopic('severance');
+
+    expect(suggestionRequests()).toHaveLength(1);
+  });
+
+  it('reads the wiki page the topic names, and the pages added to that wiki recently', async () => {
+    await protectionState.setValue({
+      ...stateWithTopics({ ...topic('Severance', {}), sources: { wiki: 'https://severance-tv.fandom.com/wiki/Severance', subreddit: null } }),
+      modelConnection: deepseek,
+    });
+    const { modelRequests, suggestionRequests } = network({ modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    const sent = JSON.stringify(modelRequests());
+    expect(suggestionRequests()).toHaveLength(0);
+    // From the page, its infobox and its text.
+    expect(sent).toContain('Aoife McArdle');
+    expect(sent).toContain('Mohamad El Masri');
+    // From the newest pages on the wiki.
+    expect(sent).toContain('Lumon Gala');
+    expect(sent).toContain('Overtime Contingency');
+    // Wiki markup is cleaned away.
+    expect(sent).not.toContain('[[');
+    expect(sent).not.toContain('{{');
+  });
+
+  it('keeps the suggested sources even when building terms then fails', async () => {
+    await severanceProtected();
+    const { suggestionRequests } = network({
+      suggestion: suggests({ fandom: 'severance-tv.fandom.com', wikipedia: 'Severance (TV series)' }),
+      modelReplies: [Response.json({ error: { message: 'Insufficient Balance' } }, { status: 402 }), deepseekReply(WELL_FORMED)],
+    });
+
+    await refreshTopic('severance');
+    expect((await storedTopic()).sources).toMatchObject({ wiki: 'https://severance-tv.fandom.com/', wikipedia: 'Severance (TV series)' });
+    await refreshTopic('severance');
+
+    expect(suggestionRequests()).toHaveLength(1);
+    expect((await storedTopic()).sources.wiki).toBe('https://severance-tv.fandom.com/wiki/Severance');
+  });
+
+  it('asks for sources again next time when the model couldn’t answer', async () => {
+    await severanceProtected();
+    const { suggestionRequests } = network({
+      suggestion: new Response('Bad gateway', { status: 502 }),
+      modelReplies: [deepseekReply(WELL_FORMED), deepseekReply(WELL_FORMED)],
+    });
+
+    await refreshTopic('severance');
+    await refreshTopic('severance');
+
+    expect(suggestionRequests()).toHaveLength(2);
+  });
+
+  it('replaces a Wikipedia title that has no article with the article it finds', async () => {
+    await severanceProtected();
+    await updateProtection((state) =>
+      changeTopic(state, 'severance', (changed) => ({ ...changed, sources: { ...changed.sources, wikipedia: 'Severance (season 9)' } })),
+    );
+    const { modelRequests } = network({ modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    expect(JSON.stringify(modelRequests())).toContain('Ben Stiller');
+    expect((await storedTopic()).sources.wikipedia).toBe('Severance (TV series)');
+  });
+
+  it('keeps a source the user changes while the refresh runs', async () => {
+    await protectionState.setValue({
+      ...stateWithTopics({ ...topic('Severance', {}), sources: { wiki: 'https://severance-tv.fandom.com/wiki/Severance', subreddit: null } }),
+      modelConnection: deepseek,
+    });
+    network({
+      modelReplies: [deepseekReply(WELL_FORMED)],
+      beforeTerms: () =>
+        updateProtection((state) =>
+          changeTopic(state, 'severance', (changed) => ({ ...changed, sources: { ...changed.sources, wiki: null } })),
+        ),
+    });
+
+    await refreshTopic('severance');
+
+    expect((await storedTopic()).sources.wiki).toBeNull();
+  });
+
+  it('gives a long Fandom page most of the room, and still leaves Wikipedia some', async () => {
+    await severanceProtected();
+    const longPage = 'The Severed Floor holds Macrodata Refinement. '.repeat(800);
+    const { modelRequests } = network({ fandomPageText: longPage, modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    const material = modelRequests()[0]!.messages[1]!.content;
+    const fromFandom = material.indexOf('From the Fandom wiki:');
+    const fromWikipedia = material.indexOf('From Wikipedia:');
+    expect(fromWikipedia - fromFandom).toBeGreaterThan(11_000);
+    expect(material.length - fromWikipedia).toBeGreaterThan(3_000);
+  });
+
+  it('keeps the Fandom wiki’s material whole and trims Wikipedia first when there is too much', async () => {
+    await severanceProtected();
+    const { modelRequests } = network({ modelReplies: [deepseekReply(WELL_FORMED)] });
+
+    await refreshTopic('severance');
+
+    const material = modelRequests()[0]!.messages[1]!.content;
+    expect(material.length).toBeLessThanOrEqual(16_500);
+    // The Fandom page ends with its last section; the Wikipedia article is cut short.
+    expect(material).toContain('Overtime Contingency');
+    expect(material).toContain('Severance was met with critical acclaim upon its release.');
+    expect(material).not.toContain(lastWords(wikipediaExtract.query.pages[0]!.extract));
+    expect(material.indexOf('Fandom')).toBeLessThan(material.indexOf('Wikipedia'));
+  });
+});
+
+/** The last few words of a text, as plain words. */
+function lastWords(text: string): string {
+  return text.trim().split(/\s+/).slice(-4).join(' ').replace(/[^\p{L}\p{N} ]/gu, '');
+}
+
+describe('browsing languages', () => {
+  it('asks for terms in every browsing language and stores each with the language the model gives', async () => {
+    await protectionState.setValue({
+      ...addTopic(stateWithTopics(), 'Severance'),
+      modelConnection: deepseek,
+      browsingLanguages: ['en', 'es'],
+    });
+    const { modelRequests } = network({
+      modelReplies: [
+        deepseekReply(
+          fenced({
+            terms: [
+              { text: 'Lumon Industries', level: 'common', strength: 'strong', language: 'en' },
+              { text: 'Industrias Lumon', level: 'common', strength: 'strong', language: 'ES' },
+              { text: 'Kier Eagan', level: 'common', strength: 'strong', language: 'fr' },
+              { text: 'Cold Harbor', level: 'major', strength: 'strong' },
+              { text: 'Optics and Design', level: 'minor', strength: 'strong', language: 'not a language' },
+            ],
+          }),
+        ),
+      ],
+    });
+
+    await refreshTopic('severance');
+
+    const instructions = modelRequests()[0]!.messages[0]!.content;
+    expect(instructions).toContain('English');
+    expect(instructions).toContain('Spanish');
+    expect(aiTerms((await storedTopic()).terms).map((term) => [term.text, term.language])).toEqual([
+      ['Lumon Industries', 'en'],
+      ['Industrias Lumon', 'es'],
+      ['Kier Eagan', 'fr'],
+      ['Cold Harbor', 'en'],
+      ['Optics and Design', 'en'],
+    ]);
   });
 });
 

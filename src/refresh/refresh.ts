@@ -14,21 +14,29 @@ import {
   type TermStrength,
 } from '@/protection/state';
 import { broadWordKind, changeTopic, sameTerm, SPOILER_LEVELS, updateProtection } from '@/protection/topics';
+import { languageName } from '@/lib/languages';
+import {
+  combineMaterial,
+  fandomMaterial,
+  fandomWikiExists,
+  LONGEST_READ_MS,
+  parseWikiAddress,
+  wikipediaArticle,
+  type SourceText,
+} from './sources';
 
 /** How much background material the model gets, in characters. */
-const MATERIAL_LIMIT = 12_000;
+const MATERIAL_LIMIT = 16_000;
 
 /** Long prompts on local models can take minutes. */
 const MODEL_TIMEOUT_MS = 5 * 60_000;
 
-const WIKIPEDIA_TIMEOUT_MS = 20_000;
-
 /**
- * The longest a refresh can run: two model calls, and two Wikipedia reads of
- * three attempts each with the waits between them. One that began longer ago
+ * The longest a refresh can run: three model calls (sources, terms and one
+ * retry) and seven reads from Wikipedia and Fandom. One that began longer ago
  * than this never finished.
  */
-const REFRESH_LIMIT_MS = 2 * MODEL_TIMEOUT_MS + 2 * (3 * WIKIPEDIA_TIMEOUT_MS + 2 * 60_000) + 60_000;
+const REFRESH_LIMIT_MS = 3 * MODEL_TIMEOUT_MS + 7 * LONGEST_READ_MS;
 
 /** Why building terms failed, worded for the settings page. */
 class RefreshError extends Error {}
@@ -42,10 +50,10 @@ export function isRefreshing(topic: ProtectedTopic, now = Date.now()): boolean {
 }
 
 /**
- * Asks the model for the topic's Related Terms and adds the new ones to its
- * list. Without a model connected it does nothing: the topic keeps working on
- * its name and the user's own terms. A failure keeps the existing list and is
- * recorded on the topic.
+ * Reads the topic's sources, asks the model for its Related Terms and adds the
+ * new ones to its list. Without a model connected it does nothing: the topic
+ * keeps working on its name and the user's own terms. A failure keeps the
+ * existing list and is recorded on the topic.
  */
 export async function refreshTopic(topicId: string): Promise<void> {
   if (running.has(topicId)) return;
@@ -73,16 +81,36 @@ async function refreshUnlessRunning(topicId: string): Promise<void> {
       const { host } = new URL(connection.baseUrl);
       throw new RefreshError(`Blackout can no longer reach ${host}. Test the connection again in AI model settings.`);
     }
-    const language = state.browsingLanguages[0] ?? 'en';
-    const material = await wikipediaArticle(topic.name, language);
-    const found = await askForTerms(connection, topic.name, material, language);
+    const languages = state.browsingLanguages.length > 0 ? state.browsingLanguages : ['en'];
+    const suggested = isNew(topic) ? await keepSuggestedSources(topic, connection, languages[0]!) : undefined;
+    // Without the model's suggestion, the sources stay unsettled so it is asked again next time.
+    const settled = suggested !== null;
+    const sources = suggested ?? topic.sources;
+
+    const fandom = sources.wiki ? await fandomMaterial(sources.wiki, topic.name) : null;
+    const wikipedia = await wikipediaArticle(topic.name, languages[0]!, sources.wikipedia);
+    const read: SourceText[] = [
+      ...(fandom ? [{ source: 'Fandom' as const, text: fandom.text }] : []),
+      ...(wikipedia ? [{ source: 'Wikipedia' as const, text: wikipedia.text }] : []),
+    ];
+    const found = await askForTerms(connection, topic.name, combineMaterial(read, MATERIAL_LIMIT), languages);
+
     await updateProtection((current) =>
       changeTopic(current, topicId, (changed) => {
-        const added = newTerms(changed, found, language);
+        const added = newTerms(changed, found);
         return {
           ...changed,
+          sources: {
+            ...changed.sources,
+            // A source the user changed while this ran wins over what this refresh read.
+            wiki: changed.sources.wiki !== sources.wiki ? changed.sources.wiki : (fandom?.pageUrl ?? sources.wiki),
+            wikipedia:
+              changed.sources.wikipedia !== sources.wikipedia || !settled
+                ? changed.sources.wikipedia
+                : (wikipedia?.title ?? sources.wikipedia ?? null),
+          },
           terms: [...changed.terms, ...added],
-          lastRefresh: { at: Date.now(), ok: true, added: added.length, sourcesRead: material ? ['Wikipedia'] : [] },
+          lastRefresh: { at: Date.now(), ok: true, added: added.length, sourcesRead: read.map((part) => part.source) },
           refreshingSince: undefined,
         };
       }),
@@ -105,6 +133,35 @@ async function refreshUnlessRunning(topicId: string): Promise<void> {
   } finally {
     stopKeepingAlive();
   }
+}
+
+/** A topic whose sources haven't been looked for yet. */
+function isNew(topic: ProtectedTopic): boolean {
+  return topic.sources.wiki === null && topic.sources.wikipedia === undefined;
+}
+
+/**
+ * Asks the model for the topic's sources and stores them straight away, so a
+ * refresh that fails later keeps them. Null when the model can't answer.
+ */
+async function keepSuggestedSources(
+  topic: ProtectedTopic,
+  connection: ModelConnection,
+  language: string,
+): Promise<ProtectedTopic['sources'] | null> {
+  const suggested = await suggestSources(connection, topic.name, language);
+  if (!suggested) return null;
+  const next = await updateProtection((state) =>
+    changeTopic(state, topic.id, (changed) => ({
+      ...changed,
+      sources: {
+        ...changed.sources,
+        wiki: changed.sources.wiki ?? suggested.wiki,
+        wikipedia: changed.sources.wikipedia !== undefined ? changed.sources.wikipedia : suggested.wikipedia,
+      },
+    })),
+  );
+  return next.topics.find((stored) => stored.id === topic.id)?.sources ?? topic.sources;
 }
 
 /**
@@ -131,99 +188,57 @@ function keepServiceWorkerAlive(): () => void {
   return () => clearInterval(timer);
 }
 
-/** Media types Wikipedia puts in brackets after a title, as in "Severance (TV series)". */
-const MEDIA_QUALIFIER =
-  /\s*\((?:\d{4} )?(?:[\w-]+ )?(?:video game|game|film|movie|TV series|television series|miniseries|series|novel|book|anime|manga|comics?|web series)\)$/i;
-
-/** Any bracketed qualifier after a Wikipedia title. */
-const QUALIFIER = /\s*\(.*\)$/;
-
 /**
- * The plain text of the topic's Wikipedia article, trimmed to fit the model, or
- * null when Wikipedia can't be read. Of the search results, the article about a
- * piece of media wins over a page that only shares its name.
+ * Asks the model where the topic is described: its Fandom wiki and its
+ * Wikipedia article. Keeps only a wiki that exists. Null when the model can't
+ * answer or its reply can't be read.
  */
-async function wikipediaArticle(name: string, language: string): Promise<string | null> {
-  // Wikipedia's sites go by language alone: "pt", not "pt-BR".
-  const api = `https://${language.split('-')[0]!.toLowerCase()}.wikipedia.org/w/api.php`;
-  const search = await readJson<{ query?: { search?: { title: string }[] } }>(
-    `${api}?${new URLSearchParams({ action: 'query', list: 'search', srsearch: name, srlimit: '5', srprop: '', format: 'json', formatversion: '2' })}`,
-  );
-  const titles = search?.query?.search?.map((result) => result.title) ?? [];
-  const sharesTopicName = (title: string) => sameTerm(title.replace(QUALIFIER, ''), name);
-  const title =
-    titles.find((candidate) => sharesTopicName(candidate) && MEDIA_QUALIFIER.test(candidate)) ??
-    titles.find(sharesTopicName) ??
-    titles[0];
-  if (!title) return null;
-
-  const article = await readJson<{ query?: { pages?: { extract?: string }[] } }>(
-    `${api}?${new URLSearchParams({ action: 'query', prop: 'extracts', explaintext: '1', exsectionformat: 'plain', titles: title, redirects: '1', format: 'json', formatversion: '2' })}`,
-  );
-  const text = article?.query?.pages?.[0]?.extract?.trim();
-  return text ? text.slice(0, MATERIAL_LIMIT) : null;
-}
-
-/**
- * Wikimedia asks browser clients to name themselves in this header, with a way
- * to reach the developer.
- */
-const API_USER_AGENT = 'Blackout/0.1 (https://github.com/AstroGaze/blackout; spoiler-blocking browser extension)';
-
-/** Wikipedia is asked at most this many times for each thing Blackout reads. */
-const WIKIPEDIA_ATTEMPTS = 3;
-
-/** Waiting longer than this for Wikipedia would hold up the refresh too long. */
-const LONGEST_WAIT_MS = 60_000;
-
-/**
- * Fetches JSON from Wikipedia, or null when it can't be read. When Wikipedia is
- * busy or limiting requests, it waits as long as Wikipedia asks, or else 5 and
- * then 10 seconds, as Wikimedia's rate-limit rules ask clients to.
- */
-async function readJson<T>(url: string): Promise<T | null> {
-  for (let attempt = 1; ; attempt++) {
-    let wait: number;
-    try {
-      const response = await fetch(url, {
-        headers: { 'Api-User-Agent': API_USER_AGENT },
-        signal: AbortSignal.timeout(WIKIPEDIA_TIMEOUT_MS),
-      });
-      if (response.ok) return (await response.json()) as T;
-      // Only a busy or rate-limited Wikipedia is worth asking again.
-      if (response.status !== 429 && response.status < 500) return null;
-      wait = retryAfterMs(response.headers.get('Retry-After')) ?? 5_000 * 2 ** (attempt - 1);
-    } catch {
-      wait = 5_000 * 2 ** (attempt - 1);
-    }
-    if (attempt === WIKIPEDIA_ATTEMPTS || wait > LONGEST_WAIT_MS) return null;
-    await new Promise((resolve) => setTimeout(resolve, wait));
+async function suggestSources(
+  connection: ModelConnection,
+  name: string,
+  language: string,
+): Promise<{ wiki: string | null; wikipedia: string | null } | null> {
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `You find where a piece of media is described online. Reply with JSON only, in this shape: {"fandom":"its Fandom wiki's address, such as gta.fandom.com, or null","wikipedia":"the exact title of its article on ${languageName(language)} Wikipedia, or null"}. Use null when you aren't sure it exists.`,
+    },
+    { role: 'user', content: `Media: ${name}` },
+  ];
+  let reply: string;
+  try {
+    reply = await chatCompletion(connection, messages, { timeoutMs: MODEL_TIMEOUT_MS });
+  } catch {
+    return null;
   }
-}
-
-/** A Retry-After header, in seconds or as a date, as milliseconds to wait. */
-function retryAfterMs(header: string | null): number | null {
-  if (!header) return null;
-  const seconds = Number(header);
-  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
-  const at = Date.parse(header);
-  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+  const parsed = jsonInReply(reply);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const { fandom, wikipedia } = parsed as { fandom?: unknown; wikipedia?: unknown };
+  const wiki = typeof fandom === 'string' ? parseWikiAddress(fandom) : null;
+  const wikiExists = wiki !== null && (await fandomWikiExists(new URL(wiki.base).hostname));
+  return {
+    wiki: wiki && wikiExists ? `${wiki.base}/` : null,
+    wikipedia: typeof wikipedia === 'string' && wikipedia.trim() !== '' ? wikipedia.trim().slice(0, 200) : null,
+  };
 }
 
 interface FoundTerm {
   text: string;
   level: SpoilerLevel;
   strength: TermStrength;
+  language: string;
 }
 
 /** What the model is asked to do, as its system message. */
-function instructions(languageName: string): string {
+function instructions(languages: string[]): string {
+  const named = languages.map((code) => `${languageName(code)} (${code})`).join(', ');
   return [
     'You build term lists for a spoiler blocker. Given a piece of media and background text about it, list the words and phrases that show a post or video is about it: other names, abbreviations and hashtags, characters, places, factions, organisations, events and notable objects.',
     'For each term give:',
     '- "level": "common" if the title, trailers, marketing or premise already reveal it; "minor" for side characters, factions and places that weren’t in the marketing; "major" for characters and events from late in the story, deaths, twists and endings, or whenever you aren’t sure.',
     '- "strength": "strong" if the term points to this media on its own; "weak" if it is also an everyday word or a common name, such as "Mark" or "Jason".',
-    `Write the terms in ${languageName}. Reply with JSON only, in this shape: {"terms":[{"text":"…","level":"common","strength":"strong"}]}`,
+    `- "language": the code of the language it is written in. List the terms people use in each of these languages: ${named}. Leave out translations nobody uses.`,
+    'Reply with JSON only, in this shape: {"terms":[{"text":"…","level":"common","strength":"strong","language":"en"}]}',
   ].join('\n');
 }
 
@@ -232,15 +247,14 @@ async function askForTerms(
   connection: ModelConnection,
   name: string,
   material: string | null,
-  language: string,
+  languages: string[],
 ): Promise<FoundTerm[]> {
-  const languageName = new Intl.DisplayNames(['en'], { type: 'language' }).of(language) ?? language;
   const messages: ChatMessage[] = [
-    { role: 'system', content: instructions(languageName) },
+    { role: 'system', content: instructions(languages) },
     { role: 'user', content: `Media: ${name}\n\nBackground:\n${material ?? '(none found)'}` },
   ];
   const reply = await chatCompletion(connection, messages, { timeoutMs: MODEL_TIMEOUT_MS });
-  const terms = parseTerms(reply);
+  const terms = parseTerms(reply, languages);
   if (terms) return terms;
 
   const retry = await chatCompletion(
@@ -252,40 +266,51 @@ async function askForTerms(
     ],
     { timeoutMs: MODEL_TIMEOUT_MS },
   );
-  const retried = parseTerms(retry);
+  const retried = parseTerms(retry, languages);
   if (retried) return retried;
   throw new RefreshError('The AI model’s reply couldn’t be read as a term list, twice. The existing terms are kept.');
+}
+
+/**
+ * The JSON value in a model's reply, or null. Reasoning models may think out
+ * loud first, and the answer may sit in a code fence.
+ */
+function jsonInReply(reply: string): unknown {
+  const answer = reply.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(answer)?.[1] ?? answer;
+  const start = fenced.search(/[[{]/);
+  const end = Math.max(fenced.lastIndexOf('}'), fenced.lastIndexOf(']'));
+  if (start === -1 || end < start) return null;
+  try {
+    return JSON.parse(fenced.slice(start, end + 1));
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Reads the model's reply as a term list, or null when it holds no usable term.
  * A missing or unknown Spoiler Level counts as Major and a missing strength as
  * Strong, so a sloppy reply never weakens protection. A term too short to point
- * to the topic is dropped, and a single everyday word is kept as Weak.
+ * to the topic is dropped, and a single everyday word is kept as Weak. A term
+ * keeps the language the model gives, and without a valid one counts as the
+ * main browsing language.
  */
-function parseTerms(reply: string): FoundTerm[] | null {
-  // Reasoning models may think out loud first; the answer may sit in a code fence.
-  const answer = reply.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(answer)?.[1] ?? answer;
-  const start = fenced.search(/[[{]/);
-  const end = Math.max(fenced.lastIndexOf('}'), fenced.lastIndexOf(']'));
-  if (start === -1 || end < start) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fenced.slice(start, end + 1));
-  } catch {
-    return null;
-  }
+function parseTerms(reply: string, languages: string[]): FoundTerm[] | null {
+  const parsed = jsonInReply(reply);
   const list = Array.isArray(parsed) ? parsed : (parsed as { terms?: unknown } | null)?.terms;
   if (!Array.isArray(list)) return null;
-  const terms = list.flatMap((item: { text?: unknown; level?: unknown; strength?: unknown } | null) => {
-    const text = typeof item?.text === 'string' ? item.text.trim() : '';
-    if (isTooShort(text)) return [];
-    const level = SPOILER_LEVELS.find((known) => known === lowercase(item?.level)) ?? 'major';
-    const everyday = broadWordKind(text) === 'everyday';
-    const strength: TermStrength = lowercase(item?.strength) === 'weak' || everyday ? 'weak' : 'strong';
-    return [{ text, level, strength }];
-  });
+  const terms = list.flatMap(
+    (item: { text?: unknown; level?: unknown; strength?: unknown; language?: unknown } | null) => {
+      const text = typeof item?.text === 'string' ? item.text.trim() : '';
+      if (isTooShort(text)) return [];
+      const level = SPOILER_LEVELS.find((known) => known === lowercase(item?.level)) ?? 'major';
+      const everyday = broadWordKind(text) === 'everyday';
+      const strength: TermStrength = lowercase(item?.strength) === 'weak' || everyday ? 'weak' : 'strong';
+      const language = languageOf(item?.language, languages);
+      return [{ text, level, strength, language }];
+    },
+  );
   return terms.length > 0 ? terms : null;
 }
 
@@ -293,6 +318,13 @@ function parseTerms(reply: string): FoundTerm[] | null {
 function isTooShort(text: string): boolean {
   const words = normalize(text).split(' ').filter(Boolean);
   return words.length === 0 || (words.length === 1 && (words[0]!.length <= 2 || /^\d+$/.test(words[0]!)));
+}
+
+/** The model's language code for a term, written as the browsing languages write it, or the main one. */
+function languageOf(given: unknown, languages: string[]): string {
+  if (typeof given !== 'string' || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(given.trim())) return languages[0]!;
+  const code = given.trim();
+  return languages.find((known) => known.toLowerCase() === code.toLowerCase()) ?? code.toLowerCase();
 }
 
 function lowercase(value: unknown): unknown {
@@ -304,13 +336,13 @@ function lowercase(value: unknown): unknown {
  * Only the topic's name and AI-added terms count: the user's own terms are kept
  * apart, so removing one never removes the AI's copy.
  */
-function newTerms(topic: ProtectedTopic, found: FoundTerm[], language: string): RelatedTerm[] {
+function newTerms(topic: ProtectedTopic, found: FoundTerm[]): RelatedTerm[] {
   const known = [topic.name, ...topic.terms.filter((term) => term.addedBy === 'ai').map((term) => term.text)];
   const added: RelatedTerm[] = [];
   for (const term of found) {
     if (known.some((text) => sameTerm(text, term.text))) continue;
     known.push(term.text);
-    added.push({ ...term, language, addedBy: 'ai' });
+    added.push({ ...term, addedBy: 'ai' });
   }
   return added;
 }

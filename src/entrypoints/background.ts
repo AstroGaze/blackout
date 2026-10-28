@@ -1,9 +1,11 @@
 import { BLOCK_MENU_ID, blockSourceUnderPointer, listenForSourceRequests } from '@/protection/blocked-sources';
+import { listenForHiddenItems } from '@/protection/suggested-blocks';
 import { startBackgroundRefresh } from '@/refresh/schedule';
 
 export default defineBackground(() => {
   startBackgroundRefresh();
   listenForSourceRequests();
+  listenForHiddenItems();
 
   // "Block this channel" on any YouTube video, Short or comment.
   browser.runtime.onInstalled.addListener(() => {

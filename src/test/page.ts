@@ -1,7 +1,7 @@
 // Helpers for page-seam tests: put a page into the simulated DOM and read back
 // what the user would see on it.
 
-import { COVER_TAG, PAGE_COVER_TAG } from '@/cover/mount';
+import { COVER_TAG, PAGE_COVER_TAG, TOAST_TAG } from '@/cover/mount';
 
 /**
  * Replaces the page body and tab title with those of `html`, as if the site
@@ -98,5 +98,31 @@ export function clickPageCoverButton(name: string): void {
     (candidate) => candidate.textContent?.trim() === name,
   );
   if (!button) throw new Error(`No "${name}" button on the page cover`);
+  button.click();
+}
+
+export interface ToastView {
+  title: string;
+  text: string;
+  buttons: string[];
+}
+
+const toast = () => document.querySelector(TOAST_TAG)?.shadowRoot ?? null;
+
+/** The Suggested Block toast on the page, or null when none is offered. */
+export function viewToast(): ToastView | null {
+  const root = toast();
+  if (!root) return null;
+  const text = (slot: string) => root.querySelector(`[data-slot="${slot}"]`)?.textContent?.trim() ?? '';
+  const buttons = Array.from(root.querySelectorAll('button'), (button) => button.textContent?.trim() ?? '');
+  return { title: text('toast-title'), text: text('toast-text'), buttons };
+}
+
+/** Clicks the button on the toast whose text is `name`. */
+export function clickToastButton(name: string): void {
+  const button = Array.from(toast()?.querySelectorAll('button') ?? []).find(
+    (candidate) => candidate.textContent?.trim() === name,
+  );
+  if (!button) throw new Error(`No "${name}" button on the toast`);
   button.click();
 }

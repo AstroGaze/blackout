@@ -114,7 +114,6 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
   - Protected Topics: name, on/off, Pause end time, chosen Fandom wiki and Wikipedia article (and a subreddit, kept for later), last refresh time and outcome.
   - Each topic's Related Terms: text, Spoiler Level, Strong or Weak, language, and whether the AI or the user added it.
   - Blocked Sources: site plus account identity.
-  - Suggested Block counts.
   - Model connection.
   - Browsing languages.
   - The thumbnail switch.
@@ -140,7 +139,7 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
   - **Performance budget.** Each batch is checked within 16 ms. The guard does nothing on unhandled sites or when no topic is active.
   - Applies the optional blur-all-thumbnails switch on YouTube.
 - **Cover UI**: the blur, the label naming the topic (or "Blocked Source"), confirm-to-reveal, and the "Block this source" action. Revealing lasts for that page view only.
-- **Suggested Block tracker**: counts Hidden Items per source per active topic and day. At 3, it offers a Suggested Block in the page and the popup. Nothing is added to Blocked Sources without the user's click.
+- **Suggested Block tracker**: counts Hidden Items per source per active topic and day. At 3, it offers a Suggested Block in the page and the popup. Nothing is added to Blocked Sources without the user's click. Its counts are stored apart from the protection state, in their own local storage item that only the background writes: they change with every Hidden Item, and a change to the protection state makes every open page check all its items again.
 - **Refresh** (background service worker):
   - **When it runs:** when a topic is added, daily via an alarm for every active topic, and on "refresh now".
   - **Collecting material:** gathers background material from the topic's Wikipedia page and its Fandom wiki: the topic's page, led by the titles of pages the wiki's community added recently. Fandom is weighted most: when the material must be trimmed to fit the model's context, Wikipedia is trimmed first, and Fandom takes up to three quarters of the room. Reading the subreddit was the plan, but Reddit closed its free API in 2026 (unauthenticated access returns 403 since May 30, 2026, and new API apps need Reddit's approval), so it moved to After v1.

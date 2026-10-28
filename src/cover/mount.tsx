@@ -5,6 +5,7 @@ import { splitShadowRootCss } from 'wxt/utils/split-shadow-root-css';
 import { Cover, type CoverProps } from './cover';
 import coverCss from './cover.css?inline';
 import { PageCover, type PageCoverProps } from './page-cover';
+import { Toast, type ToastProps } from './toast';
 
 /**
  * Sites like YouTube shrink the root font size, so rem units would shrink the
@@ -18,6 +19,7 @@ const { documentCss, shadowCss } = splitShadowRootCss(remToPx(coverCss));
 
 export const COVER_TAG = 'blackout-cover';
 export const PAGE_COVER_TAG = 'blackout-page-cover';
+export const TOAST_TAG = 'blackout-toast';
 
 const PRESS_EVENTS = [
   'pointerdown',
@@ -126,4 +128,26 @@ export function mountPageCover(doc: Document, props: PageCoverProps): void {
 export function unmountPageCover(doc: Document): void {
   unmount(pageCovers.get(doc));
   pageCovers.delete(doc);
+}
+
+const toasts = new WeakMap<Document, Mounted>();
+
+/**
+ * Shows a toast in the page's bottom-right corner. It sits in the body, so a
+ * full-page cover hides it with the rest of the page.
+ */
+export function mountToast(doc: Document, props: ToastProps): void {
+  unmountToast(doc);
+  const mounted = mountInShadow(
+    doc.body ?? doc.documentElement,
+    TOAST_TAG,
+    { position: 'fixed', right: '24px', bottom: '24px', 'z-index': '2147483646' },
+    <Toast {...props} />,
+  );
+  toasts.set(doc, mounted);
+}
+
+export function unmountToast(doc: Document): void {
+  unmount(toasts.get(doc));
+  toasts.delete(doc);
 }

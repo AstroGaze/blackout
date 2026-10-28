@@ -64,8 +64,6 @@ export interface ModelConnection {
 export interface ProtectionState {
   topics: ProtectedTopic[];
   blockedSources: BlockedSource[];
-  /** Hidden Item counts keyed by source, topic and day. */
-  suggestedBlockCounts: Record<string, number>;
   modelConnection: ModelConnection | null;
   browsingLanguages: string[];
   blurAllThumbnails: boolean;
@@ -124,7 +122,6 @@ export function initialProtectionState(): ProtectionState {
   return {
     topics: [structuredClone(GTA6_PRESET)],
     blockedSources: [],
-    suggestedBlockCounts: {},
     modelConnection: null,
     browsingLanguages: ['en'],
     blurAllThumbnails: false,

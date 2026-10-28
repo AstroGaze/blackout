@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { Logo } from '@/components/logo';
 import { PauseMenu } from '@/components/pause-menu';
+import { SuggestedBlocksList } from '@/components/suggested-blocks-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -43,6 +44,7 @@ export function App() {
             <TopicCard key={topic.id} topic={topic} now={now} modelConnected={state.modelConnection !== null} />
           ))
         )}
+        <SuggestedBlocksList state={state} now={now} />
       </main>
 
       <footer className="flex gap-2 border-t p-4">

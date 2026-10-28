@@ -2,11 +2,13 @@ import { coverReason } from '@/cover/cover';
 import { COVER_TAG, mountCover, unmountCover } from '@/cover/mount';
 import { compileMatcher, type HideReason, type Matcher } from '@/matcher/matcher';
 import { requestBlock, requestUnblock } from '@/protection/blocked-sources';
+import { reportHiddenItem } from '@/protection/suggested-blocks';
 import { nextPauseEnd, protectionState, type BlockedSource, type ProtectionState } from '@/protection/state';
 import type { CoverLayout, SiteAdapter } from '@/sites/adapter';
 import { inheritPageContext, sharePageContext } from './frame-context';
 import { holdMedia, holdMediaIn, releaseMediaIn } from './media';
 import { answerSourceUnderPointer } from './source-under-pointer';
+import { offerSuggestedBlocks } from './suggested-block-toast';
 import { guardPageCover, PAGE_STATE_ATTRIBUTE } from './page-cover-guard';
 
 export interface PageGuard {
@@ -177,6 +179,7 @@ export function startPageGuard(
       recheckAll();
       sharing.notify();
     },
+    onHiddenForTopic: (source, reason, key) => countHidden(source, reason, key),
     onMaskChange: (masked) =>
       masked ? holdMediaIn(doc) : releaseMediaIn(doc, mayPlay),
   });
@@ -220,6 +223,20 @@ export function startPageGuard(
       },
       onBlockSource: source ? () => void requestBlock(source) : undefined,
       onUnblock: reason.kind === 'blockedSource' ? () => void requestUnblock(reason.source) : undefined,
+    });
+    // Only items with an identity count, so one can't count twice by changing its text.
+    const itemKey = adapter.itemKey(item);
+    if (reason.kind === 'topic' && source && itemKey && !isMirror(item)) countHidden(source, reason, itemKey);
+  };
+
+  /** Hidden Items already reported for Suggested Blocks during this page view. */
+  const reported = new Set<string>();
+  const countHidden = (source: BlockedSource, reason: HideReason & { kind: 'topic' }, key: string) => {
+    const id = JSON.stringify([source.site, source.account, reason.topicId, key]);
+    if (reported.has(id)) return;
+    reported.add(id);
+    reportHiddenItem({ source, topicId: reason.topicId, topicName: reason.topicName, itemKey: key }).catch(() => {
+      // Without the background, nothing is counted; the item stays hidden all the same.
     });
   };
 
@@ -310,6 +327,7 @@ export function startPageGuard(
   let pauseEndTimer: ReturnType<typeof setTimeout> | undefined;
   let pauseEnd: number | null = null;
   let latestState: ProtectionState | null = null;
+  const suggestions = offerSuggestedBlocks(doc, adapter.site, () => latestState);
   /** Compiles the protection state and checks the page and every item against it. */
   const applyState = (state: ProtectionState) => {
     if (stopped) return;
@@ -329,6 +347,7 @@ export function startPageGuard(
     page.recheck(matcher);
     awaitingMatcher.clear();
     recheckAll();
+    suggestions.refresh();
     // A Pause switches its topic back on by itself when it ends.
     pauseEnd = nextPauseEnd(state, now);
     if (pauseEnd !== null) pauseEndTimer = setTimeout(() => applyState(state), pauseEnd - now);
@@ -363,6 +382,7 @@ export function startPageGuard(
       doc.removeEventListener('play', pauseIfHidden, true);
       stopProtectingInteractions?.();
       stopAnsweringSource();
+      suggestions.stop();
       for (const item of coveredItems) removeCover(item);
       page.stop();
       sharing.stop();

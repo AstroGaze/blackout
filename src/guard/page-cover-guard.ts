@@ -41,6 +41,8 @@ export interface PageCoverEvents {
   onContextChange(): void;
   /** The page became masked, or stopped being masked. */
   onMaskChange(masked: boolean): void;
+  /** The page, posted by `source`, was covered for a topic; `key` identifies what it shows. */
+  onHiddenForTopic?(source: BlockedSource, reason: HideReason & { kind: 'topic' }, key: string): void;
 }
 
 /**
@@ -150,6 +152,9 @@ export function guardPageCover(
     clearTimeout(uncheckedTimer);
     const verdict = matcher.check({ text, source: subjectSource });
     const verdictReason = verdict.hide ? verdict.reason : null;
+    if (verdictReason?.kind === 'topic' && subjectSource && subjectKey) {
+      events.onHiddenForTopic?.(subjectSource, verdictReason, subjectKey);
+    }
     if (state === 'continued') {
       // Continuing lasts for the page view: only learn what the page is about now.
       setState('continued', verdictReason);

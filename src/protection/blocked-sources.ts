@@ -6,7 +6,7 @@ import { browser } from 'wxt/browser';
 import type { BlockedSource, ProtectionState, SourceId } from './state';
 import { updateProtection } from './topics';
 
-function sameSource(a: SourceId, b: SourceId): boolean {
+export function sameSource(a: SourceId, b: SourceId): boolean {
   return a.site === b.site && a.account === b.account;
 }
 

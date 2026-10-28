@@ -62,6 +62,15 @@ function coverLabel(item: Element): string | null {
   return coverOf(item)?.querySelector('[data-slot="cover-topic"]')?.textContent ?? null;
 }
 
+/** Whether `element` looks blurred: it or an element around it has a blur filter. */
+export function isBlurred(element: Element): boolean {
+  const view = element.ownerDocument.defaultView ?? window;
+  for (let current: Element | null = element; current; current = current.parentElement) {
+    if (view.getComputedStyle(current).filter.includes('blur(')) return true;
+  }
+  return false;
+}
+
 /** Whether focus (Tab) and screen readers can reach `element`. */
 export function isKeyboardReachable(element: Element): boolean {
   return element.closest('[inert]') === null;

@@ -1,6 +1,7 @@
 import { Pause, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
+import { BlurThumbnailsSwitch } from '@/components/blur-thumbnails-switch';
 import { Logo } from '@/components/logo';
 import { PauseMenu } from '@/components/pause-menu';
 import { SuggestedBlocksList } from '@/components/suggested-blocks-list';
@@ -45,6 +46,8 @@ export function App() {
           ))
         )}
         <SuggestedBlocksList state={state} now={now} />
+        <div className="bg-border h-px" />
+        <BlurThumbnailsSwitch on={state.blurAllThumbnails} description="Turn on for launch week" />
       </main>
 
       <footer className="flex gap-2 border-t p-4">

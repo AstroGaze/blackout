@@ -74,6 +74,32 @@ export const youtube: SiteAdapter = {
     // The player YouTube lays over a tile or Short while hovering it.
     { selector: 'ytd-video-preview', cover: 'card', mirrors: true },
   ],
+  thumbnails: [
+    // Tiles in feeds, recommendations and Shorts shelves.
+    'yt-thumbnail-view-model',
+    // Search results, and the picture behind the player.
+    'ytd-thumbnail',
+    // Frames from a search result's chapters.
+    'ytd-macro-markers-list-item-renderer #thumbnail',
+    'ytd-playlist-thumbnail',
+    // The big picture on a watch card beside search results.
+    'ytd-single-hero-image-renderer',
+    'ytd-collage-hero-image-renderer',
+    // The player's still before it plays, its end screen and end cards.
+    '.ytp-cued-thumbnail-overlay-image',
+    '.ytp-modern-videowall-still-image',
+    '.ytp-videowall-still-image',
+    '.ytp-ce-covering-image',
+    '.ytp-autonav-endscreen-upnext-thumbnail',
+    // What the Shorts player shows while the next Short loads.
+    '.reel-video-in-sequence-thumbnail',
+    'ytd-notification-renderer .thumbnail-container',
+    // The video a hovered tile previews; the preview itself can carry a cover.
+    'ytd-video-preview video',
+    'ytd-video-preview img',
+    // The video a channel's home page plays by itself; its end screen holds items.
+    'ytd-channel-video-player-renderer video',
+  ],
   // YouTube marks the watch page metadata with its video once it has loaded.
   observedAttributes: ['video-id'],
   protectInteractions: skipCoveredSuggestions,

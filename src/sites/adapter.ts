@@ -22,6 +22,12 @@ export interface SiteAdapter {
    * outermost one is checked and covered, together with everything inside it.
    */
   itemKinds: ItemKind[];
+  /**
+   * Every picture of a video or post (thumbnails, hover previews), which the
+   * blur-all-thumbnails switch blurs. None may contain an item, whose cover would
+   * be blurred with it.
+   */
+  thumbnails?: string[];
   /** All the text of an item that should be checked. */
   itemText(item: Element): string;
   /** The account that posted an item, or null when the site doesn't show it there. */

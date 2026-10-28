@@ -23,6 +23,9 @@ export interface PageGuard {
 const STATE_ATTRIBUTE = 'data-blackout';
 type ItemState = 'clean' | 'covered' | 'revealed' | 'nested';
 
+/** Strong enough that nothing in a covered item or a thumbnail can be made out. */
+const BLUR = 'blur(24px)';
+
 /** Plain selector lists rather than :is(), which some engines evaluate unreliably. */
 function hideFirstCss(selectors: string[]): string {
   const each = (suffix: string) => selectors.map((selector) => selector + suffix).join(',\n');
@@ -31,11 +34,23 @@ function hideFirstCss(selectors: string[]): string {
 ${each(`:not([${STATE_ATTRIBUTE}])`)} { visibility: hidden !important; }
 ${each(covered)} { position: relative !important; overflow: hidden !important; }
 ${each(`${covered} > :not(${COVER_TAG})`)} {
-  filter: blur(24px) !important;
+  filter: ${BLUR} !important;
   pointer-events: none !important;
   user-select: none !important;
 }
 html[${PAGE_STATE_ATTRIBUTE}] body { visibility: hidden !important; }`;
+}
+
+/**
+ * Blurs every thumbnail, for the blur-all-thumbnails switch, clipped to its own
+ * box so the blur doesn't spread over what's around it.
+ */
+function blurThumbnailsCss(thumbnails: string[]): string {
+  if (thumbnails.length === 0) return '';
+  return `${thumbnails.join(',\n')} {
+  filter: ${BLUR} !important;
+  clip-path: inset(0 round 12px) !important;
+}`;
 }
 
 /** Keeps focus and screen readers out of a covered item's own content. */
@@ -93,6 +108,11 @@ export function startPageGuard(
   const style = doc.createElement('style');
   style.textContent = hideFirstCss(selectors);
   doc.documentElement.append(style);
+  // Thumbnails stay blurred until the switch is known to be off, so none shows before the setting is read.
+  const thumbnailBlurCss = blurThumbnailsCss(adapter.thumbnails ?? []);
+  const thumbnailStyle = doc.createElement('style');
+  thumbnailStyle.textContent = thumbnailBlurCss;
+  doc.documentElement.append(thumbnailStyle);
 
   let matcher: Matcher | null = null;
   const awaitingMatcher = new Set<Element>();
@@ -333,6 +353,7 @@ export function startPageGuard(
     if (stopped) return;
     clearTimeout(pauseEndTimer);
     latestState = state;
+    thumbnailStyle.textContent = state.blurAllThumbnails ? thumbnailBlurCss : '';
     const now = Date.now();
     try {
       matcher = compileMatcher(state, now);
@@ -388,6 +409,7 @@ export function startPageGuard(
       sharing.stop();
       inherited.stop();
       style.remove();
+      thumbnailStyle.remove();
     },
   };
 }

@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { BlockedSourcesSettings } from '@/components/blocked-sources-settings';
+import { DisplaySettings } from '@/components/display-settings';
 import { LanguageSettings } from '@/components/language-settings';
 import { Logo } from '@/components/logo';
 import { ModelSettings } from '@/components/model-settings';
@@ -43,6 +44,7 @@ const SECTIONS = [
   { hash: '#blocked', label: 'Blocked Sources' },
   { hash: '#model', label: 'AI model' },
   { hash: '#languages', label: 'Languages' },
+  { hash: '#display', label: 'Display' },
 ] as const;
 
 /** The address hash, kept current as it changes. */
@@ -106,6 +108,8 @@ export function App() {
           <BlockedSourcesSettings sources={state.blockedSources} />
         ) : hash === '#languages' ? (
           <LanguageSettings languages={state.browsingLanguages} />
+        ) : hash === '#display' ? (
+          <DisplaySettings blurAllThumbnails={state.blurAllThumbnails} />
         ) : selected === null ? (
           <section className="bg-card flex flex-col items-start gap-4 rounded-2xl border p-6">
             <div className="flex flex-col gap-1.5">

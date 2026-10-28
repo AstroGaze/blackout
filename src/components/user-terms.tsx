@@ -3,6 +3,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { TermChip } from '@/components/term-chip';
 import { Label } from '@/components/ui/label';
 import type { ProtectedTopic } from '@/protection/state';
 import {
@@ -52,14 +53,7 @@ export function UserTerms({ topic }: { topic: ProtectedTopic }) {
       {terms.length > 0 && (
         <ul aria-label={`Your own terms for ${topic.name}`} className="flex flex-wrap gap-2">
           {terms.map((term) => (
-            <li
-              key={term.text}
-              className="bg-muted inline-flex h-7 items-center gap-1.5 rounded-md pr-1 pl-2.5 text-[13px] font-medium"
-            >
-              {term.text}
-              {term.strength === 'weak' && (
-                <span className="text-muted-foreground text-xs font-normal">common word</span>
-              )}
+            <TermChip key={term.text} term={term}>
               <Button
                 variant="ghost"
                 aria-label={`Remove ${term.text}`}
@@ -68,7 +62,7 @@ export function UserTerms({ topic }: { topic: ProtectedTopic }) {
               >
                 <X className="size-3.5" />
               </Button>
-            </li>
+            </TermChip>
           ))}
         </ul>
       )}

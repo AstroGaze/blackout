@@ -4,6 +4,7 @@ import { GTA6_PRESET } from './state';
 import {
   addTopic,
   addUserTerm,
+  aiTermsByLevel,
   removeUserTerm,
   TermTextError,
   topicNameWarning,
@@ -94,5 +95,43 @@ describe('storing your own Related Terms', () => {
 
     expect(() => addUserTerm(state, 'severance', text)).toThrow(TermTextError);
     expect(() => addUserTerm(state, 'severance', text)).toThrow(message);
+  });
+});
+
+describe('Related Terms grouped by Spoiler Level for the term viewer', () => {
+  it('puts the GTA 6 preset’s seeded terms under their levels', () => {
+    const levels = aiTermsByLevel(gta6());
+
+    expect(levels.common.map((term) => term.text)).toEqual([
+      'GTA 6',
+      'GTA VI',
+      'Grand Theft Auto VI',
+      '#GTA6',
+      'Leonida',
+      'Jason',
+      'Lucia',
+      'Vice City',
+    ]);
+    expect([levels.minor, levels.major]).toEqual([[], []]);
+  });
+
+  it('leaves out your own terms, which are listed openly elsewhere', () => {
+    const state = addUserTerm(stateWithTopics(gta6()), GTA6_PRESET.id, 'Port Gellhorn');
+
+    expect(aiTermsByLevel(state.topics[0]!).common.map((term) => term.text)).not.toContain('Port Gellhorn');
+  });
+
+  it('puts a term whose Spoiler Level is missing or unknown under Major', () => {
+    const topic = gta6();
+    topic.terms = [
+      { ...topic.terms[0]!, text: 'Cal Hampton', level: 'minor' },
+      { ...topic.terms[0]!, text: 'Brian Heder', level: undefined as never },
+      { ...topic.terms[0]!, text: 'Boobie Ike', level: 'huge' as never },
+    ];
+
+    const levels = aiTermsByLevel(topic);
+
+    expect(levels.minor.map((term) => term.text)).toEqual(['Cal Hampton']);
+    expect(levels.major.map((term) => term.text)).toEqual(['Brian Heder', 'Boobie Ike']);
   });
 });

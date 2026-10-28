@@ -6,6 +6,7 @@ import {
   type ProtectedTopic,
   type ProtectionState,
   type RelatedTerm,
+  type SpoilerLevel,
 } from './state';
 
 const MINUTE = 60 * 1000;
@@ -140,6 +141,24 @@ export class TermTextError extends Error {}
  */
 export function userTerms(topic: ProtectedTopic): RelatedTerm[] {
   return topic.terms.filter((term) => term.addedBy === 'user');
+}
+
+/** Spoiler Levels, least revealing first. */
+export const SPOILER_LEVELS = ['common', 'minor', 'major'] as const satisfies readonly SpoilerLevel[];
+
+/**
+ * The topic's AI-added terms by Spoiler Level, for the term viewer. A term whose
+ * level is missing or unknown counts as Major, so viewing a level never shows
+ * something worse than the user agreed to see.
+ */
+export function aiTermsByLevel(topic: ProtectedTopic): Record<SpoilerLevel, RelatedTerm[]> {
+  const levels: Record<SpoilerLevel, RelatedTerm[]> = { common: [], minor: [], major: [] };
+  for (const term of topic.terms) {
+    if (term.addedBy !== 'ai') continue;
+    const level = SPOILER_LEVELS.includes(term.level) ? term.level : 'major';
+    levels[level].push(term);
+  }
+  return levels;
 }
 
 /** A term's run-together form: the matcher reads "#Lumon" and "Lu mon" as "Lumon" too. */

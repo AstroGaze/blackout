@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { Logo } from '@/components/logo';
 import { PauseMenu } from '@/components/pause-menu';
+import { SPOILER_LEVEL_LABELS, TermViewer } from '@/components/term-viewer';
 import { UserTerms } from '@/components/user-terms';
 import {
   AlertDialog,
@@ -20,11 +21,13 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatTimeLeft } from '@/lib/format';
 import { useNow, useProtectionState } from '@/lib/use-protection';
-import { GTA6_PRESET, type ProtectedTopic, type SpoilerLevel } from '@/protection/state';
+import { GTA6_PRESET, type ProtectedTopic } from '@/protection/state';
 import {
+  aiTermsByLevel,
   deleteTopic,
   resumeTopic,
   setTopicEnabled,
+  SPOILER_LEVELS,
   topicStatus,
   updateProtection,
   userTerms,
@@ -171,37 +174,41 @@ function TopicPanel({ topic, now }: { topic: ProtectedTopic; now: number }) {
   );
 }
 
-const LEVELS: { level: SpoilerLevel; label: string }[] = [
-  { level: 'common', label: 'Common knowledge' },
-  { level: 'minor', label: 'Minor' },
-  { level: 'major', label: 'Major' },
-];
-
-/** How many Related Terms the topic has per Spoiler Level, without showing any of them. */
+/**
+ * How many Related Terms the topic has per Spoiler Level, with the terms themselves
+ * behind the term viewer.
+ */
 function RelatedTermsSummary({ topic }: { topic: ProtectedTopic }) {
-  const generated = topic.terms.filter((term) => term.addedBy === 'ai');
+  const levels = aiTermsByLevel(topic);
+  const hasGeneratedTerms = SPOILER_LEVELS.some((level) => levels[level].length > 0);
   const andYours = userTerms(topic).length > 0 ? ', and by your own terms' : '';
   return (
     <section className="bg-card flex flex-col gap-5 rounded-2xl border p-6">
       <div className="flex flex-col gap-1.5">
         <h2 className="text-base leading-none font-semibold">Related Terms</h2>
         <p className="text-muted-foreground">
-          {generated.length === 0
-            ? `None yet. ${topic.name} is protected by its name, including its spacing and hashtag variants${andYours}.`
-            : 'Hidden to protect you.'}
+          {hasGeneratedTerms
+            ? 'Hidden to protect you.'
+            : `None yet. ${topic.name} is protected by its name, including its spacing and hashtag variants${andYours}.`}
         </p>
       </div>
-      {generated.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          {LEVELS.map(({ level, label }) => (
-            <div key={level} className="flex flex-col gap-1 rounded-lg border p-3.5">
-              <span className="text-muted-foreground text-[13px]">{label}</span>
-              <span className="text-2xl font-semibold">
-                {generated.filter((term) => term.level === level).length}
-              </span>
-            </div>
-          ))}
-        </div>
+      {hasGeneratedTerms && (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {SPOILER_LEVELS.map((level) => (
+              <div key={level} className="flex flex-col gap-1 rounded-lg border p-3.5">
+                <span className="text-muted-foreground text-[13px]">{SPOILER_LEVEL_LABELS[level]}</span>
+                <span className="text-2xl font-semibold">{levels[level].length}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TermViewer topic={topic}>
+              <Button>View terms…</Button>
+            </TermViewer>
+            <span className="text-muted-foreground text-[13px]">Opens behind a warning, least revealing first.</span>
+          </div>
+        </>
       )}
     </section>
   );

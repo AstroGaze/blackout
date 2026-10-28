@@ -1,7 +1,8 @@
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AddTopicDialog } from '@/components/add-topic-dialog';
 import { Logo } from '@/components/logo';
+import { ModelSettings } from '@/components/model-settings';
 import { PauseMenu } from '@/components/pause-menu';
 import { SPOILER_LEVEL_LABELS, TermViewer } from '@/components/term-viewer';
 import { UserTerms } from '@/components/user-terms';
@@ -33,8 +34,26 @@ import {
   userTerms,
 } from '@/protection/topics';
 
+/** The settings sections, by the address hash that opens each. */
+const SECTIONS = [
+  { hash: '', label: 'Protected Topics' },
+  { hash: '#model', label: 'AI model' },
+] as const;
+
+/** The address hash, kept current as it changes. */
+function useHash(): string {
+  const [hash, setHash] = useState(location.hash);
+  useEffect(() => {
+    const update = () => setHash(location.hash);
+    addEventListener('hashchange', update);
+    return () => removeEventListener('hashchange', update);
+  }, []);
+  return hash;
+}
+
 export function App() {
   const state = useProtectionState();
+  const hash = useHash();
   const now = useNow();
   const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,13 +82,22 @@ export function App() {
           <Logo />
         </div>
         <span className="text-muted-foreground px-2 pt-2 pb-1 text-xs font-medium">Settings</span>
-        <a href="#" aria-current="page" className="bg-muted flex h-8 items-center rounded-md px-2 font-medium">
-          Protected Topics
-        </a>
+        {SECTIONS.map((section) => (
+          <a
+            key={section.hash}
+            href={section.hash || '#'}
+            aria-current={section.hash === hash || (section.hash === '' && hash === '#') ? 'page' : undefined}
+            className="hover:bg-muted/60 aria-[current=page]:bg-muted text-foreground/85 aria-[current=page]:text-foreground flex h-8 items-center rounded-md px-2 aria-[current=page]:font-medium"
+          >
+            {section.label}
+          </a>
+        ))}
       </nav>
 
       <main className="flex max-w-[920px] min-w-0 flex-[999_1_560px] flex-col gap-6 px-6 py-8">
-        {selected === null ? (
+        {hash === '#model' ? (
+          <ModelSettings connection={state.modelConnection} />
+        ) : selected === null ? (
           <section className="bg-card flex flex-col items-start gap-4 rounded-2xl border p-6">
             <div className="flex flex-col gap-1.5">
               <h1 className="text-xl font-semibold">Nothing is protected yet</h1>

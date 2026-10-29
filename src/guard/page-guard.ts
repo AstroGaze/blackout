@@ -26,6 +26,13 @@ type ItemState = 'clean' | 'covered' | 'revealed' | 'nested';
 /** Strong enough that nothing in a covered item or a thumbnail can be made out. */
 const BLUR = 'blur(24px)';
 
+/**
+ * How long one turn of checking may run: half a frame at 60 frames per second,
+ * leaving the other half as headroom on slower machines. Items a turn doesn't
+ * reach stay hidden until a later one.
+ */
+const CHECK_TURN_MS = 8;
+
 /** Plain selector lists rather than :is(), which some engines evaluate unreliably. */
 function hideFirstCss(selectors: string[]): string {
   const each = (suffix: string) => selectors.map((selector) => selector + suffix).join(',\n');
@@ -115,6 +122,11 @@ export function startPageGuard(
   doc.documentElement.append(thumbnailStyle);
 
   let matcher: Matcher | null = null;
+  /**
+   * Set while the matcher can hide nothing (no topic is active), when nothing is
+   * hidden or checked.
+   */
+  let idle = false;
   const awaitingMatcher = new Set<Element>();
   /** The text each item had when it was last checked, to skip unchanged items. */
   const checkedText = new WeakMap<Element, string>();
@@ -167,20 +179,61 @@ export function startPageGuard(
     }
   };
 
-  /** Checks every item again, as when the page's own topic changes what Weak Terms mean. */
   /** Acts on every item on the page, the outermost one where items nest. */
   const forEachItem = (act: (item: Element) => void) => {
     for (const element of doc.querySelectorAll(selector)) {
       if (itemOf(element) === element) act(element);
     }
   };
-  const recheckAll = () =>
+
+  /** Items waiting for a check, in the order they arrived, which is mostly page order. */
+  const queued = new Set<Element>();
+  /**
+   * Time spent checking in the current task. All its turns share one budget:
+   * covering an item changes the page, which sets off another batch before the
+   * browser can paint.
+   */
+  let spentThisTask = 0;
+  /** The next task's turn, which starts its budget afresh. */
+  let nextTurn: number | undefined;
+  const startNextTask = () => {
+    nextTurn = undefined;
+    spentThisTask = 0;
+    if (queued.size > 0) checkQueued();
+  };
+  /** Checks queued items while the task's budget lasts, and carries on in the next task. */
+  const checkQueued = () => {
+    const start = win.performance.now();
+    const deadline = start + CHECK_TURN_MS - spentThisTask;
+    for (const item of queued) {
+      if (win.performance.now() >= deadline) break;
+      queued.delete(item);
+      if (!item.isConnected) continue;
+      check(item);
+    }
+    spentThisTask += win.performance.now() - start;
+    nextTurn ??= win.setTimeout(startNextTask, 0);
+    // A shown item waiting here may have changed, so it mustn't show until checked.
+    for (const item of queued) if (isShown(item)) withhold(item);
+  };
+  const queueChecks = (items: Iterable<Element>) => {
+    for (const item of items) queued.add(item);
+    checkQueued();
+  };
+
+  /** Checks every item again, as when the page's own topic changes what Weak Terms mean. */
+  const recheckAll = () => {
+    if (idle) return;
+    const items: Element[] = [];
     forEachItem((item) => {
       checkedText.delete(item);
-      check(item);
+      items.push(item);
     });
+    queueChecks(items);
+  };
   /** Nothing hidden or covered may play, so a video can't spoil by sound. */
   const mayPlay = (media: HTMLMediaElement) => {
+    if (idle) return true;
     if (page.isMasked()) return false;
     const item = itemOf(media);
     return item === null || isShown(item);
@@ -217,6 +270,7 @@ export function startPageGuard(
     checkedText.delete(item);
     removeCover(item);
     setState(item, null);
+    holdMediaIn(item);
   };
 
   const show = (item: Element, state: 'clean' | 'revealed') => {
@@ -302,9 +356,19 @@ export function startPageGuard(
       if (enclosing) items.add(enclosing);
       for (const node of record.addedNodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
-        for (const element of [node as Element, ...(node as Element).querySelectorAll(selector)]) {
-          const item = itemOf(element);
-          if (item) items.add(item);
+        // Everything inside an item belongs to it, so there's nothing more to look for.
+        const item = itemOf(node as Element);
+        if (item) {
+          items.add(item);
+          continue;
+        }
+        // In document order an item comes before what it contains, so each element
+        // is either inside the last outermost item or starts a new one.
+        let outermost: Element | null = null;
+        for (const element of (node as Element).querySelectorAll(selector)) {
+          if (outermost?.contains(element)) continue;
+          outermost = element;
+          items.add(element);
         }
       }
     }
@@ -313,14 +377,16 @@ export function startPageGuard(
 
   const observer = new win.MutationObserver((records) => {
     page.update(matcher);
-    for (const item of itemsAffectedBy(records)) check(item);
+    queueChecks(itemsAffectedBy(records));
   });
-  observer.observe(doc.documentElement, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-    attributeFilter: adapter.observedAttributes,
-  });
+  const observe = () =>
+    observer.observe(doc.documentElement, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributeFilter: adapter.observedAttributes,
+    });
+  observe();
   for (const element of doc.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
 
   // "Block this channel" in the right-click menu blocks the item under the pointer,
@@ -335,6 +401,7 @@ export function startPageGuard(
   const stopProtectingInteractions = adapter.protectInteractions?.({
     win,
     isShown: (element) => {
+      if (idle) return true;
       const item = itemOf(element);
       return item !== null && isShown(item);
     },
@@ -342,6 +409,31 @@ export function startPageGuard(
 
   /** Hides every item until a check can run again. */
   const withholdAll = () => forEachItem(withhold);
+
+  /**
+   * Stops or resumes protecting the page. While idle the guard watches nothing and
+   * hides nothing: every item loses its state and cover, and the hide-first
+   * stylesheet is emptied.
+   */
+  const setIdle = (next: boolean) => {
+    if (next === idle) return;
+    idle = next;
+    if (idle) {
+      observer.disconnect();
+      win.clearTimeout(nextTurn);
+      nextTurn = undefined;
+      queued.clear();
+      withholdAll();
+      style.textContent = '';
+      page.goIdle();
+      releaseMediaIn(doc, mayPlay);
+    } else {
+      style.textContent = hideFirstCss(selectors);
+      // Items wait hidden for their check again, so none of them may play meanwhile.
+      forEachItem(holdMediaIn);
+      observe();
+    }
+  };
 
   let stopped = false;
   let pauseEndTimer: ReturnType<typeof setTimeout> | undefined;
@@ -361,12 +453,14 @@ export function startPageGuard(
       // Without a matcher nothing passes a check, so everything stays hidden.
       console.error('[Blackout] Could not use the protection state', error);
       matcher = null;
+      setIdle(false);
       withholdAll();
       page.cannotCheck();
       return;
     }
     page.recheck(matcher);
     awaitingMatcher.clear();
+    setIdle(!matcher.protects);
     recheckAll();
     suggestions.refresh();
     // A Pause switches its topic back on by itself when it ends.
@@ -396,6 +490,7 @@ export function startPageGuard(
     stop() {
       stopped = true;
       clearTimeout(pauseEndTimer);
+      win.clearTimeout(nextTurn);
       doc.removeEventListener('visibilitychange', catchUpOnPauses);
       win.removeEventListener('focus', catchUpOnPauses);
       stopWatching();

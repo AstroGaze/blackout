@@ -17,6 +17,8 @@ export interface CheckableItem {
 
 export interface Matcher {
   check(item: CheckableItem): Verdict;
+  /** Whether it can hide anything: a topic is active. Blocked Sources only apply while one is. */
+  protects: boolean;
 }
 
 /**
@@ -109,6 +111,7 @@ export function compileMatcher(state: ProtectionState, now = Date.now()): Matche
   }
 
   return {
+    protects: activeTopics.length > 0,
     check(item) {
       const blocked = item.source && activeTopics.length > 0 && blockedSources.get(`${item.source.site} ${item.source.account}`);
       if (blocked) return { hide: true, reason: { kind: 'blockedSource', source: blocked } };

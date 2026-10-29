@@ -41,15 +41,15 @@ async function openWatchPageWithChat(videoId: string, html: string) {
   const watchDocument = watchWindow.document as unknown as Document;
   guards.push(startPageGuard(youtube, watchWindow as unknown as BrowserWindow));
   renderPage(html, watchDocument);
-  await settle();
+  await settle(watchDocument);
 
   const frame = watchDocument.createElement('iframe');
   watchDocument.body.append(frame);
-  await settle();
+  await settle(watchDocument);
   const chatWindow = frame.contentWindow as unknown as BrowserWindow;
   guards.push(startPageGuard(youtube, chatWindow));
   renderPage(liveChat, chatWindow.document);
-  await settle();
+  await settle(watchDocument, chatWindow.document);
   return { watchDocument, chatDocument: chatWindow.document };
 }
 
@@ -59,7 +59,7 @@ async function postMessage(chatDocument: Document, text: string) {
   const message = template.cloneNode(true) as Element;
   message.querySelector('#message')!.textContent = text;
   template.parentElement!.append(message);
-  await settle();
+  await settle(chatDocument);
   return message;
 }
 
@@ -88,7 +88,7 @@ describe('YouTube live chat inside a watch page', () => {
     const metadata = watchDocument.querySelector('ytd-watch-metadata')!;
     metadata.querySelector('#title h1')!.textContent = 'Red Dead Redemption 2 Trailer';
     metadata.setAttribute('video-id', OTHER_VIDEO);
-    await settle();
+    await settle(watchDocument, chatDocument);
 
     expect(viewItem(message)).toMatchObject({ state: 'shown' });
   });

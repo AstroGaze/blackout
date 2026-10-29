@@ -180,6 +180,7 @@ describe('blocking a source from the page', () => {
     await open(otherWatchPage, '/watch?v=gmA6MrX81z4');
     commentStarting('9 years ago now').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
     await blockSourceUnderPointer(1, 0);
+    await settle();
 
     expect((await blockedSources()).map((source) => source.account)).toEqual(['@mrbeast', '@driftyonline', '@ok9054']);
     expect(viewItem(commentStarting('9 years ago now'))).toMatchObject({ state: 'covered', reason: 'Blocked Source' });

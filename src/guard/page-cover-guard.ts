@@ -29,6 +29,11 @@ export interface PageCoverGuard {
   recheck(matcher: Matcher): void;
   /** Covers a page about one thing as unchecked, as when the protection state is broken. */
   cannotCheck(): void;
+  /**
+   * Stops masking the page or waiting for its subject while nothing is protected.
+   * A page the user continued stays continued, as for its whole page view.
+   */
+  goIdle(): void;
   /** Whether the page is hidden or covered, so nothing on it may show or play. */
   isMasked(): boolean;
   /** Topics the page is about, so Weak Terms on it count. */
@@ -215,6 +220,12 @@ export function guardPageCover(
       clearTimeout(uncheckedTimer);
       checkedKey = null;
       setState('unchecked', null);
+    },
+    goIdle() {
+      if (state === 'continued') return;
+      setState('none', null);
+      // Protecting again starts from the subject the page shows then.
+      enterSubject(null);
     },
     isMasked,
     contextTopicIds: () => {

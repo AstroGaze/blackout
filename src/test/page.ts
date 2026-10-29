@@ -20,9 +20,30 @@ export function renderPage(html: string, doc: Document = document): void {
   doc.body.replaceChildren(template.content);
 }
 
-/** Lets pending storage reads and mutation callbacks run. */
-export async function settle(): Promise<void> {
-  for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * Lets pending storage reads, mutation callbacks and the guard's later turns of
+ * checking run, until the pages have stopped changing for a few turns. Pages in
+ * windows of their own, such as frames, need passing in.
+ */
+export async function settle(...docs: Document[]): Promise<void> {
+  let changed = false;
+  const observers = (docs.length > 0 ? docs : [document]).map((doc) => {
+    const view = doc.defaultView ?? window;
+    const observer = new view.MutationObserver(() => {
+      changed = true;
+    });
+    observer.observe(doc.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+    return observer;
+  });
+  try {
+    for (let quiet = 0, turn = 0; quiet < 3 && turn < 500; turn++) {
+      changed = false;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      quiet = changed ? 0 : quiet + 1;
+    }
+  } finally {
+    for (const observer of observers) observer.disconnect();
+  }
 }
 
 export type ItemView =

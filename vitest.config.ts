@@ -1,7 +1,11 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig, type TestProjectInlineConfiguration } from 'vitest/config';
 import { WxtVitest } from 'wxt/testing/vitest-plugin';
 
-export default defineConfig({
+/** Tests that time Blackout's work, which other tests running alongside would slow. */
+const TIMING_TESTS = 'src/**/*.timing.test.ts';
+
+const project = (test: TestProjectInlineConfiguration['test']): TestProjectInlineConfiguration => ({
+  // The plugin sets up the fake extension APIs, which a project doesn't inherit.
   plugins: [WxtVitest()],
   test: {
     environment: 'happy-dom',
@@ -13,5 +17,16 @@ export default defineConfig({
         settings: { enableIframePageLoading: true },
       },
     },
+    ...test,
+  },
+});
+
+export default defineConfig({
+  test: {
+    projects: [
+      project({ name: 'pages', exclude: [...configDefaults.exclude, TIMING_TESTS] }),
+      // Run after the others, on their own.
+      project({ name: 'timing', include: [TIMING_TESTS], sequence: { groupOrder: 1 } }),
+    ],
   },
 });

@@ -136,7 +136,7 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
   - **Hide-first.** At document start, a stylesheet hides every item kind the adapter declares. A mutation observer batches newly added items, runs them through the matcher and un-hides clean ones.
   - **Covering.** Matched items get the cover. A page-level match gets the full-page cover, and the tab title is masked.
   - **Fail-closed.** Items whose check errors or overruns stay hidden.
-  - **Performance budget.** Each batch is checked within 16 ms. The guard does nothing on unhandled sites or when no topic is active.
+  - **Performance budget.** Each batch is checked within 16 ms: checking runs in turns of at most 8 ms, half a frame, and items a turn doesn't reach stay hidden until a later one. The guard does nothing on unhandled sites. When no topic is active it goes idle: it hides nothing, stops observing the page and checks nothing.
   - Applies the optional blur-all-thumbnails switch on YouTube.
 - **Cover UI**: the blur, the label naming the topic (or "Blocked Source"), confirm-to-reveal, and the "Block this source" action. Revealing lasts for that page view only.
 - **Suggested Block tracker**: counts Hidden Items per source per active topic and day. At 3, it offers a Suggested Block in the page and the popup. Nothing is added to Blocked Sources without the user's click. Its counts are stored apart from the protection state, in their own local storage item that only the background writes: they change with every Hidden Item, and a change to the protection state makes every open page check all its items again.

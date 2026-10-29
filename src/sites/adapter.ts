@@ -1,5 +1,5 @@
 import type { CoverLayout } from '@/cover/cover';
-import type { BlockedSource, Site } from '@/protection/state';
+import type { BlockedSource, Site, SourceId } from '@/protection/state';
 
 export type { CoverLayout };
 
@@ -28,10 +28,24 @@ export interface SiteAdapter {
    * be blurred with it.
    */
   thumbnails?: string[];
+  /**
+   * Elements whose open shadow roots hold items, such as a search box that keeps
+   * its suggestions there. Items inside them are hidden and checked like any other.
+   */
+  shadowHosts?: string[];
   /** All the text of an item that should be checked. */
   itemText(item: Element): string;
-  /** The account that posted an item, or null when the site doesn't show it there. */
-  itemSource(item: Element): BlockedSource | null;
+  /**
+   * The accounts an item comes from, such as a video's channel, or a Reddit post's
+   * subreddit and author; empty when the site doesn't show them there. Blocking any
+   * one hides the item. The first is the one its cover offers to block.
+   */
+  itemSources(item: Element): BlockedSource[];
+  /**
+   * The community the page is in, such as a thread's subreddit, or null. Everything
+   * on the page counts as posted there, which makes a topic's own community context.
+   */
+  pagePlace?(doc: Document): SourceId | null;
   /**
    * Identifies the content an item currently shows (a video, a post), so a reveal
    * survives the site redrawing it but not the site reusing it for other content.
@@ -63,8 +77,8 @@ export interface PageSubject {
   key: string;
   /** The text to check, or null while the site hasn't rendered it yet. */
   text: string | null;
-  /** The account that posted it, such as a video's channel, when known. */
-  source?: BlockedSource | null;
+  /** The accounts it comes from, such as a video's channel, when known; the first is the one to offer blocking. */
+  sources?: BlockedSource[];
 }
 
 /**

@@ -104,10 +104,10 @@ export const youtube: SiteAdapter = {
   observedAttributes: ['video-id'],
   protectInteractions: skipCoveredSuggestions,
   itemText: readText,
-  itemSource(item) {
+  itemSources(item) {
     // A video's description links other channels, such as its game's; it belongs to the video's own.
-    if (item.matches('#description-inner')) return watchPageChannel(item.ownerDocument);
-    return channelOf(item);
+    const channel = item.matches('#description-inner') ? watchPageChannel(item.ownerDocument) : channelOf(item);
+    return channel ? [channel] : [];
   },
   itemKey(item) {
     // Links may be relative or absolute, and an item can be a link itself.
@@ -135,6 +135,7 @@ export const youtube: SiteAdapter = {
     const titleText = title ? readText(title).trim() : '';
     if (!metadata || titleText === '') return { key, text: null };
     const channel = metadata.querySelector('#owner ytd-channel-name');
-    return { key, text: `${titleText} ${channel ? readText(channel) : ''}`, source: watchPageChannel(doc) };
+    const owner = watchPageChannel(doc);
+    return { key, text: `${titleText} ${channel ? readText(channel) : ''}`, sources: owner ? [owner] : [] };
   },
 };

@@ -22,8 +22,9 @@ export function BlockedSourcesSettings({ sources }: { sources: BlockedSource[] }
       <section className="bg-card flex flex-col gap-4 rounded-2xl border p-6">
         {sources.length === 0 ? (
           <p className="text-muted-foreground">
-            None yet. Choose “Block source” on a hidden video, or right-click any YouTube video,
-            Short or comment and choose “Block this channel”.
+            None yet. Choose “Block source” on a hidden video or post. Or right-click any YouTube
+            video, Short or comment and choose “Block this channel”, or any Reddit post or comment
+            and choose “Block this subreddit” or “Block this user”.
           </p>
         ) : (
           <ul aria-label="Blocked Sources" className="flex flex-col divide-y rounded-lg border">

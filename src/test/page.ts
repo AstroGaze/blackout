@@ -17,7 +17,23 @@ export function renderPage(html: string, doc: Document = document): void {
   const bodyStart = html.indexOf('>', html.search(/<body[\s>]/i)) + 1;
   const template = doc.createElement('template');
   template.innerHTML = html.slice(bodyStart, html.search(/<\/body>/i));
+  attachDeclaredShadowRoots(template.content);
   doc.body.replaceChildren(template.content);
+}
+
+/**
+ * Attaches the shadow roots a saved page declares with `<template shadowrootmode>`,
+ * as the browser's parser does, so they are in place when the page goes in.
+ */
+function attachDeclaredShadowRoots(root: ParentNode): void {
+  for (const declared of Array.from(root.querySelectorAll<HTMLTemplateElement>('template[shadowrootmode]'))) {
+    const host = declared.parentElement;
+    if (!host || host.shadowRoot) continue;
+    const shadow = host.attachShadow({ mode: declared.getAttribute('shadowrootmode') === 'closed' ? 'closed' : 'open' });
+    attachDeclaredShadowRoots(declared.content);
+    shadow.append(declared.content);
+    declared.remove();
+  }
 }
 
 /**
@@ -56,9 +72,9 @@ export type TitleOf = (item: Element) => string;
 
 const wholeText: TitleOf = (item) => (item.textContent ?? '').replace(/\s+/g, ' ').trim();
 
-/** What the user sees for each item matching `selector`. */
-export function viewItems(selector: string, titleOf: TitleOf = wholeText): ItemView[] {
-  return Array.from(document.querySelectorAll(selector), (item) => viewItem(item, titleOf));
+/** What the user sees for each item matching `selector`, in the page or in one of its shadow roots. */
+export function viewItems(selector: string, titleOf: TitleOf = wholeText, root: ParentNode = document): ItemView[] {
+  return Array.from(root.querySelectorAll(selector), (item) => viewItem(item, titleOf));
 }
 
 export function viewItem(item: Element, titleOf: TitleOf = wholeText): ItemView {
@@ -70,9 +86,15 @@ export function viewItem(item: Element, titleOf: TitleOf = wholeText): ItemView 
   return { title, state: 'shown' };
 }
 
-export function coveredTitles(selector: string, titleOf: TitleOf = wholeText): string[] {
-  return viewItems(selector, titleOf)
+export function coveredTitles(selector: string, titleOf: TitleOf = wholeText, root: ParentNode = document): string[] {
+  return viewItems(selector, titleOf, root)
     .filter((view) => view.state === 'covered')
+    .map((view) => view.title);
+}
+
+export function shownTitles(selector: string, titleOf: TitleOf = wholeText, root: ParentNode = document): string[] {
+  return viewItems(selector, titleOf, root)
+    .filter((view) => view.state === 'shown')
     .map((view) => view.title);
 }
 

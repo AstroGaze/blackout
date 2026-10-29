@@ -39,7 +39,12 @@ function hideFirstCss(selectors: string[]): string {
   const covered = `[${STATE_ATTRIBUTE}="covered"]`;
   return `
 ${each(`:not([${STATE_ATTRIBUTE}])`)} { visibility: hidden !important; }
-${each(covered)} { position: relative !important; overflow: hidden !important; }
+${each(covered)} {
+  position: relative !important;
+  overflow: hidden !important;
+  /* The cover stays above the item's content, but not above the site's own header. */
+  isolation: isolate !important;
+}
 ${each(`${covered} > :not(${COVER_TAG})`)} {
   filter: ${BLUR} !important;
   pointer-events: none !important;
@@ -115,6 +120,21 @@ export function startPageGuard(
   const style = doc.createElement('style');
   style.textContent = hideFirstCss(selectors);
   doc.documentElement.append(style);
+  /**
+   * Shadow roots that hold items. Document styles and observers don't reach into
+   * them, so each gets its own copy of the hide-first stylesheet and is observed too.
+   */
+  const hostSelector = adapter.shadowHosts?.join(', ') ?? '';
+  const shadowRoots: ShadowRoot[] = [];
+  const shadowStyles: HTMLStyleElement[] = [];
+  /**
+   * Hosts seen before their shadow root was attached, by when to give up on them.
+   * They are looked at again on later changes and every frame: attaching a shadow
+   * root and filling it changes nothing the observer sees.
+   */
+  const hostsWithoutShadow = new Map<Element, number>();
+  const LATE_SHADOW_ROOT_MS = 10_000;
+  let lateShadowFrame: number | undefined;
   // Thumbnails stay blurred until the switch is known to be off, so none shows before the setting is read.
   const thumbnailBlurCss = blurThumbnailsCss(adapter.thumbnails ?? []);
   const thumbnailStyle = doc.createElement('style');
@@ -136,14 +156,14 @@ export function startPageGuard(
   const coverReasons = new WeakMap<Element, HideReason>();
   const contentKey = (item: Element, text: string) => adapter.itemKey(item) ?? text;
   /**
-   * The account that posted an item, or null when the site doesn't show it or it
-   * can't be read. For offering to block it; a check reads it itself and fails closed.
+   * The accounts an item comes from, or none when the site doesn't show them or
+   * they can't be read. For offering to block them; a check reads them itself and fails closed.
    */
-  const sourceOf = (item: Element): BlockedSource | null => {
+  const sourcesOf = (item: Element): BlockedSource[] => {
     try {
-      return adapter.itemSource(item);
+      return adapter.itemSources(item);
     } catch {
-      return null;
+      return [];
     }
   };
 
@@ -179,10 +199,12 @@ export function startPageGuard(
     }
   };
 
-  /** Acts on every item on the page, the outermost one where items nest. */
+  /** Acts on every item on the page, shadow roots included, the outermost one where items nest. */
   const forEachItem = (act: (item: Element) => void) => {
-    for (const element of doc.querySelectorAll(selector)) {
-      if (itemOf(element) === element) act(element);
+    for (const root of [doc, ...shadowRoots]) {
+      for (const element of root.querySelectorAll(selector)) {
+        if (itemOf(element) === element) act(element);
+      }
     }
   };
 
@@ -284,7 +306,8 @@ export function startPageGuard(
     coverReasons.set(item, reason);
     holdMediaIn(item);
     coveredItems.add(item);
-    const source = reason.kind === 'topic' ? sourceOf(item) : null;
+    const sources = reason.kind === 'topic' ? sourcesOf(item) : [];
+    const [source] = sources;
     mountCover(item, {
       layout: coverLayoutOf(item),
       reason: coverReason(reason),
@@ -300,7 +323,9 @@ export function startPageGuard(
     });
     // Only items with an identity count, so one can't count twice by changing its text.
     const itemKey = adapter.itemKey(item);
-    if (reason.kind === 'topic' && source && itemKey && !isMirror(item)) countHidden(source, reason, itemKey);
+    if (reason.kind === 'topic' && itemKey && !isMirror(item)) {
+      for (const each of sources) countHidden(each, reason, itemKey);
+    }
   };
 
   /** Hidden Items already reported for Suggested Blocks during this page view. */
@@ -336,7 +361,13 @@ export function startPageGuard(
       const key = contentKey(item, text);
       if (revealedKeys.get(item) === key) return show(item, 'revealed');
       if (isMirror(item) && checkMirror(item, key)) return;
-      const verdict = matcher.check({ text, contextTopicIds: contextTopicIds(), source: adapter.itemSource(item) });
+      const place = adapter.pagePlace?.(doc);
+      const verdict = matcher.check({
+        text,
+        contextTopicIds: contextTopicIds(),
+        sources: adapter.itemSources(item),
+        places: place ? [place] : [],
+      });
       if (verdict.hide) cover(item, verdict.reason, key);
       else show(item, 'clean');
     } catch (error) {
@@ -377,25 +408,75 @@ export function startPageGuard(
 
   const observer = new win.MutationObserver((records) => {
     page.update(matcher);
+    if (hostSelector) watchNewShadowRoots(records);
     queueChecks(itemsAffectedBy(records));
   });
-  const observe = () =>
-    observer.observe(doc.documentElement, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributeFilter: adapter.observedAttributes,
-    });
+  const observeOptions: MutationObserverInit = {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributeFilter: adapter.observedAttributes,
+  };
+  const observe = () => {
+    observer.observe(doc.documentElement, observeOptions);
+    for (const root of shadowRoots) observer.observe(root, observeOptions);
+  };
+
+  const lookForLateShadowRoots = () => {
+    lateShadowFrame = undefined;
+    const now = win.performance.now();
+    for (const [host, giveUpAt] of hostsWithoutShadow) {
+      if (!host.isConnected || now > giveUpAt) hostsWithoutShadow.delete(host);
+      else watchShadowOf(host);
+    }
+  };
+  const watchShadowOf = (host: Element) => {
+    const root = host.shadowRoot;
+    if (!root) {
+      if (!hostsWithoutShadow.has(host)) hostsWithoutShadow.set(host, win.performance.now() + LATE_SHADOW_ROOT_MS);
+      lateShadowFrame ??= win.requestAnimationFrame(lookForLateShadowRoots);
+      return;
+    }
+    hostsWithoutShadow.delete(host);
+    if (shadowRoots.includes(root)) return;
+    shadowRoots.push(root);
+    const copy = doc.createElement('style');
+    copy.textContent = style.textContent;
+    root.append(copy);
+    shadowStyles.push(copy);
+    if (!idle) observer.observe(root, observeOptions);
+    const items: Element[] = [];
+    for (const element of root.querySelectorAll(selector)) if (itemOf(element) === element) items.push(element);
+    queueChecks(items);
+  };
+  const watchNewShadowRoots = (records: MutationRecord[]) => {
+    for (const host of hostsWithoutShadow.keys()) watchShadowOf(host);
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const element = node as Element;
+        if (element.matches(hostSelector)) watchShadowOf(element);
+        for (const host of element.querySelectorAll(hostSelector)) watchShadowOf(host);
+      }
+    }
+  };
+  /** Sets the hide-first rules everywhere they apply: the document and each shadow root. */
+  const setHideFirstCss = (css: string) => {
+    for (const each of [style, ...shadowStyles]) each.textContent = css;
+  };
+
   observe();
+  if (hostSelector) for (const host of doc.querySelectorAll(hostSelector)) watchShadowOf(host);
   for (const element of doc.querySelectorAll(selector)) awaitingMatcher.add(itemOf(element)!);
 
-  // "Block this channel" in the right-click menu blocks the item under the pointer,
-  // or the channel a right-clicked link points to, such as a video's channel name.
+  // The right-click menu's "Block this channel" (or subreddit, or user) blocks a source
+  // of the item under the pointer, or the one a right-clicked link points to, such as a
+  // video's channel name.
   const stopAnsweringSource = answerSourceUnderPointer(win, (target) => {
     const item = itemOf(target);
-    if (item) return sourceOf(item);
+    if (item) return sourcesOf(item);
     const link = target.closest('a[href]');
-    return link ? sourceOf(link) : null;
+    return link ? sourcesOf(link) : [];
   });
 
   const stopProtectingInteractions = adapter.protectInteractions?.({
@@ -424,14 +505,16 @@ export function startPageGuard(
       nextTurn = undefined;
       queued.clear();
       withholdAll();
-      style.textContent = '';
+      setHideFirstCss('');
       page.goIdle();
       releaseMediaIn(doc, mayPlay);
     } else {
-      style.textContent = hideFirstCss(selectors);
+      setHideFirstCss(hideFirstCss(selectors));
       // Items wait hidden for their check again, so none of them may play meanwhile.
       forEachItem(holdMediaIn);
       observe();
+      // Shadow hosts added while idle weren't seen.
+      if (hostSelector) for (const host of doc.querySelectorAll(hostSelector)) watchShadowOf(host);
     }
   };
 
@@ -504,6 +587,8 @@ export function startPageGuard(
       sharing.stop();
       inherited.stop();
       style.remove();
+      for (const copy of shadowStyles) copy.remove();
+      if (lateShadowFrame !== undefined) win.cancelAnimationFrame(lateShadowFrame);
       thumbnailStyle.remove();
     },
   };

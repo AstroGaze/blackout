@@ -1,4 +1,5 @@
 import { isTopicActive, type BlockedSource, type ProtectedTopic, type ProtectionState, type SourceId } from '@/protection/state';
+import { subredditSource } from '@/protection/subreddits';
 
 /** Why an item is hidden: it is about a Protected Topic, or it comes from a Blocked Source. */
 export type HideReason =
@@ -11,9 +12,14 @@ export interface CheckableItem {
   text: string;
   /** Topics the item's surroundings are about, such as the page it sits on. */
   contextTopicIds?: ReadonlySet<string>;
-  /** The account that posted the item, when the site shows it. */
-  source?: SourceId | null;
+  /** The accounts the item comes from, when the site shows them, such as a post's subreddit and author. */
+  sources?: readonly SourceId[];
+  /** Where it was posted, when that isn't one of its sources, such as the subreddit a comment's thread is in. */
+  places?: readonly SourceId[];
 }
+
+/** How a source is looked up: its site and account. */
+const sourceKey = (source: SourceId) => `${source.site} ${source.account}`;
 
 export interface Matcher {
   check(item: CheckableItem): Verdict;
@@ -107,13 +113,24 @@ export function compileMatcher(state: ProtectionState, now = Date.now()): Matche
   const blockedSources = new Map<string, BlockedSource>();
   for (const source of state.blockedSources) {
     if (typeof source.site !== 'string' || typeof source.account !== 'string') throw new Error('Malformed Blocked Source');
-    blockedSources.set(`${source.site} ${source.account}`, source);
+    blockedSources.set(sourceKey(source), source);
+  }
+
+  /**
+   * Each active topic's own subreddit. Everything posted there is about the
+   * topic, so its Weak Terms count on their own.
+   */
+  const topicsBySubreddit = new Map<string, ProtectedTopic>();
+  for (const topic of activeTopics) {
+    const subreddit = subredditSource(topic.sources?.subreddit);
+    if (subreddit) topicsBySubreddit.set(sourceKey(subreddit), topic);
   }
 
   return {
     protects: activeTopics.length > 0,
     check(item) {
-      const blocked = item.source && activeTopics.length > 0 && blockedSources.get(`${item.source.site} ${item.source.account}`);
+      const blocked =
+        activeTopics.length > 0 && (item.sources ?? []).map((source) => blockedSources.get(sourceKey(source))).find(Boolean);
       if (blocked) return { hide: true, reason: { kind: 'blockedSource', source: blocked } };
       // Look for every term at every word, so overlapping terms of different topics all count.
       const words = normalize(item.text).split(' ');
@@ -127,6 +144,9 @@ export function compileMatcher(state: ProtectionState, now = Date.now()): Matche
           }
         }
       });
+      const postedInTopicSubreddit = new Set(
+        [...(item.sources ?? []), ...(item.places ?? [])].map((place) => topicsBySubreddit.get(sourceKey(place))),
+      );
       for (const topic of activeTopics) {
         const matched = matchedTermsByTopic.get(topic);
         if (!matched) continue;
@@ -135,7 +155,8 @@ export function compileMatcher(state: ProtectionState, now = Date.now()): Matche
         if (
           matched.size > 1 ||
           [...matched].some((term) => term.strong) ||
-          item.contextTopicIds?.has(topic.id)
+          item.contextTopicIds?.has(topic.id) ||
+          postedInTopicSubreddit.has(topic)
         ) {
           return { hide: true, reason: { kind: 'topic', topicId: topic.id, topicName: topic.name } };
         }

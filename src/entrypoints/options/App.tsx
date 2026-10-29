@@ -8,6 +8,7 @@ import { Logo } from '@/components/logo';
 import { ModelSettings } from '@/components/model-settings';
 import { PauseMenu } from '@/components/pause-menu';
 import { RefreshCard } from '@/components/refresh-card';
+import { TopicSubreddit } from '@/components/topic-subreddit';
 import { SPOILER_LEVEL_LABELS, TermViewer } from '@/components/term-viewer';
 import { UserTerms } from '@/components/user-terms';
 import {
@@ -220,6 +221,7 @@ function TopicPanel({
       <RelatedTermsSummary topic={topic} />
       <RefreshCard topic={topic} now={now} modelConnected={modelConnected} />
       <UserTerms topic={topic} />
+      <TopicSubreddit topic={topic} />
     </>
   );
 }

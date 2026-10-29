@@ -66,8 +66,8 @@ export function guardPageCover(
   let subjectKey: string | null = null;
   /** The newest text the current subject has shown. */
   let subjectText: string | null = null;
-  /** The account that posted the current subject, when the site shows it. */
-  let subjectSource: BlockedSource | null = null;
+  /** The accounts the current subject comes from, when the site shows them. */
+  let subjectSources: BlockedSource[] = [];
   /** The text and account last checked, as `checkKey` gives them. */
   let checkedKey: string | null = null;
   /** The previous subject's text, which the site may still show under the new key. */
@@ -100,7 +100,7 @@ export function guardPageCover(
 
     if (state === 'covered' || state === 'unchecked') {
       const covering = state === 'covered' ? reason : null;
-      const source = subjectSource;
+      const [source] = subjectSources;
       mountPageCover(doc, {
         reason: covering && coverReason(covering),
         onContinue: () => setState('continued', reason),
@@ -142,23 +142,23 @@ export function guardPageCover(
     subjectKey = key;
     staleText = subjectText;
     subjectText = null;
-    subjectSource = null;
+    subjectSources = [];
     checkedKey = null;
     // A title kept for the previous subject must not come back for this one.
     siteTitle = null;
     clearTimeout(uncheckedTimer);
   };
 
-  /** What a check looks at: the subject's text and the account that posted it. */
-  const checkKey = () => JSON.stringify([subjectText, subjectSource?.account ?? null]);
+  /** What a check looks at: the subject's text and the accounts it comes from. */
+  const checkKey = () => JSON.stringify([subjectText, subjectSources.map((source) => source.account)]);
 
   const check = (matcher: Matcher, text: string) => {
     checkedKey = checkKey();
     clearTimeout(uncheckedTimer);
-    const verdict = matcher.check({ text, source: subjectSource });
+    const verdict = matcher.check({ text, sources: subjectSources });
     const verdictReason = verdict.hide ? verdict.reason : null;
-    if (verdictReason?.kind === 'topic' && subjectSource && subjectKey) {
-      events.onHiddenForTopic?.(subjectSource, verdictReason, subjectKey);
+    if (verdictReason?.kind === 'topic' && subjectKey) {
+      for (const source of subjectSources) events.onHiddenForTopic?.(source, verdictReason, subjectKey);
     }
     if (state === 'continued') {
       // Continuing lasts for the page view: only learn what the page is about now.
@@ -184,7 +184,7 @@ export function guardPageCover(
       }
       if (subject.text !== null && subject.text !== staleText) {
         subjectText = subject.text;
-        subjectSource = subject.source ?? null;
+        subjectSources = subject.sources ?? [];
       }
 
       const checkable =

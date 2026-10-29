@@ -27,6 +27,12 @@ export function unblockSource(state: ProtectionState, source: SourceId): Protect
 /** The message that asks a page which source was last right-clicked on it. */
 export const SOURCE_UNDER_POINTER = 'source-under-pointer';
 
+export interface SourceUnderPointerRequest {
+  type: typeof SOURCE_UNDER_POINTER;
+  /** Only a source whose account starts with this, such as "u/" for a Reddit user. */
+  accountPrefix?: string;
+}
+
 /** What a page asks the background to do with a source. */
 const CHANGES = { 'block-source': blockSource, 'unblock-source': unblockSource } as const;
 
@@ -64,16 +70,23 @@ export function listenForSourceRequests(): () => void {
   return () => browser.runtime.onMessage.removeListener(onMessage);
 }
 
-/** The id of the right-click menu entry that blocks a channel. */
-export const BLOCK_MENU_ID = 'block-source';
+/**
+ * The right-click menu entries that block a source, on the sites each belongs to.
+ * YouTube's keeps the id it had when it was the only one.
+ */
+export const BLOCK_MENU_ENTRIES = [
+  { id: 'block-source', title: 'Block this channel', sites: ['*://www.youtube.com/*'], accountPrefix: '' },
+  { id: 'block-subreddit', title: 'Block this subreddit', sites: ['*://www.reddit.com/*'], accountPrefix: 'r/' },
+  { id: 'block-reddit-user', title: 'Block this user', sites: ['*://www.reddit.com/*'], accountPrefix: 'u/' },
+] as const;
 
 /**
  * Blocks the source of whatever was right-clicked in a tab, as the right-click
- * menu entry does: the page knows which item it was, the background stores it.
+ * menu entries do: the page knows which item it was, the background stores it.
+ * `accountPrefix` picks one kind of source, such as "u/" for a Reddit user.
  */
-export async function blockSourceUnderPointer(tabId: number, frameId: number): Promise<void> {
-  const source: unknown = await browser.tabs
-    .sendMessage(tabId, { type: SOURCE_UNDER_POINTER }, { frameId })
-    .catch(() => null);
+export async function blockSourceUnderPointer(tabId: number, frameId: number, accountPrefix = ''): Promise<void> {
+  const request: SourceUnderPointerRequest = { type: SOURCE_UNDER_POINTER, accountPrefix };
+  const source: unknown = await browser.tabs.sendMessage(tabId, request, { frameId }).catch(() => null);
   if (isBlockedSource(source)) await updateProtection((state) => blockSource(state, source));
 }

@@ -127,7 +127,8 @@ On YouTube, Reddit and X, Blackout hides every new piece of content as it arrive
   - Paused or switched-off topics are ignored.
 - **Site adapters** (YouTube, Reddit, X): one per site, all with the same shape. Each knows:
   - which elements are checkable items (video tile, Short, comment, chat message, post, reply, search suggestion, notification),
-  - how to pull the item's text and source identity,
+  - how to pull the item's text and its sources (a video's channel; a Reddit post's subreddit and author, either of which can be blocked),
+  - which open shadow roots hold items, such as Reddit's search box,
   - where to place the cover,
   - how to tell whether the page as a whole is about a topic (watch page, thread, single post).
 

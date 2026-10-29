@@ -1,23 +1,26 @@
 import { browser } from 'wxt/browser';
-import { SOURCE_UNDER_POINTER } from '@/protection/blocked-sources';
+import { SOURCE_UNDER_POINTER, type SourceUnderPointerRequest } from '@/protection/blocked-sources';
 import type { BlockedSource } from '@/protection/state';
 
 /**
- * Answers the background with the source of what was last right-clicked on this
- * page, for "Block this channel" in the right-click menu. `sourceOf` names the
- * source of an element, or null. Returns a function that stops it.
+ * Answers the background with a source of what was last right-clicked on this
+ * page, for "Block this channel" and the like in the right-click menu. `sourcesOf` names the
+ * sources of an element. The background can ask for one kind, such as a Reddit
+ * user ("u/") rather than the subreddit. Returns a function that stops it.
  */
-export function answerSourceUnderPointer(win: Window, sourceOf: (target: Element) => BlockedSource | null): () => void {
-  let underPointer: BlockedSource | null = null;
+export function answerSourceUnderPointer(win: Window, sourcesOf: (target: Element) => BlockedSource[]): () => void {
+  let underPointer: BlockedSource[] = [];
   // Capture phase, so a cover that keeps presses to itself still counts.
   const remember = (event: Event) => {
     const target = event.target as Element | null;
-    underPointer = target && typeof target.closest === 'function' ? sourceOf(target) : null;
+    underPointer = target && typeof target.closest === 'function' ? sourcesOf(target) : [];
   };
   win.document.addEventListener('contextmenu', remember, true);
   const onMessage = (message: unknown) => {
-    if ((message as { type?: unknown } | null)?.type !== SOURCE_UNDER_POINTER) return undefined;
-    return Promise.resolve(underPointer);
+    const request = message as Partial<SourceUnderPointerRequest> | null;
+    if (request?.type !== SOURCE_UNDER_POINTER) return undefined;
+    const prefix = typeof request.accountPrefix === 'string' ? request.accountPrefix : '';
+    return Promise.resolve(underPointer.find((source) => source.account.startsWith(prefix)) ?? null);
   };
   browser.runtime.onMessage.addListener(onMessage);
   return () => {

@@ -133,7 +133,7 @@ function WikipediaSource({ topic }: { topic: ProtectedTopic }) {
 }
 
 /** Stores the user's change to a source. Returns no problem, as `SourceRow` expects. */
-function saveSources(topicId: string, sources: Partial<ProtectedTopic['sources']>): null {
+export function saveSources(topicId: string, sources: Partial<ProtectedTopic['sources']>): null {
   void updateProtection((state) =>
     changeTopic(state, topicId, (topic) => ({ ...topic, sources: { ...topic.sources, ...sources } })),
   );
@@ -150,7 +150,8 @@ interface SourceRowProps {
   onSave: (typed: string) => string | null;
 }
 
-function SourceRow({ label, badge, value, current, placeholder, onSave }: SourceRowProps) {
+/** One of a topic's sources, shown with a way to change it in place. */
+export function SourceRow({ label, badge, value, current, placeholder, onSave }: SourceRowProps) {
   const inputId = useId();
   const [editing, setEditing] = useState(false);
   const [typed, setTyped] = useState(current);

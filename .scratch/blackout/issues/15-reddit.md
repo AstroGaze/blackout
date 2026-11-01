@@ -85,6 +85,13 @@ Implemented: a Reddit site adapter (`src/sites/reddit/adapter.ts`) and content s
 - **Arrow keys in the search box:** these move focus onto the suggestion links. Covered suggestions are inert, so focus skips them. Whether the box's own text changes as focus moves wasn't checked, since the script couldn't read the input inside Reddit's shadow root.
 - **No page errors.**
 
+**Edge cases the user found (2026-10-31), from a signed-in screenshot of the empty search box and the home sidebar:**
+- **Fixed, the empty search box:**
+  - **The gap:** before anything is typed, the box shows trending searches and, when signed in, recent searches. Their rows carry no `data-testid`, so `li[data-testid^="search-sdui-"]` missed them, and "GTA 6 Gameplay Reveal on South Park" showed in Trending.
+  - **The fix:** the item is now every row of the dropdown (`#search-dropdown-results-container li`), an id found only inside the search box. A new snapshot of the empty box (`search-trending.html`) tests it, along with rows shaped like Reddit's trending and recent ones.
+  - **Checked live:** the trending GTA 6 row is covered.
+- **Still open, signed-in only:** the row of recent communities at the top of the empty box, and the "Recent posts" panel on the home sidebar, only show when signed in. Headless Brave can't sign in, and Claude in Chrome refuses reddit.com. They need the user to copy their markup from their own browser.
+
 **Not done:**
 - **Usernames:** a comment's author name, above its text, isn't checked or covered.
 - **Untested surfaces:** no snapshot was taken of a search results page or of r/popular. Their posts are `shreddit-post` too, but that wasn't checked live.

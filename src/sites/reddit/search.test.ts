@@ -7,9 +7,12 @@ import { renderPage, settle } from '@/test/page';
 import { gta6, stateWithTopics } from '@/test/state';
 import { reddit } from './adapter';
 import searchPage from './fixtures/search-suggestions.html?raw';
+import searchTrending from './fixtures/search-trending.html?raw';
 import { coveredTitles, shownTitles, viewItem } from './fixtures/view';
 
 const SUGGESTION = 'li[data-testid^="search-sdui-"]';
+/** Any row of the search box's dropdown. */
+const ROW = '#search-dropdown-results-container li';
 
 let guard: PageGuard | undefined;
 
@@ -82,13 +85,42 @@ describe('Reddit search suggestions for "gta"', () => {
     await settle();
     // The element upgrades later and renders into its own shadow root, which changes nothing outside it.
     const shadow = host.attachShadow({ mode: 'open' });
-    shadow.innerHTML = '<ul><li data-testid="search-sdui-query-autocomplete" data-label="gta 6 ending"><a>gta 6 ending</a></li></ul>';
+    shadow.innerHTML =
+      '<div id="search-dropdown-results-container"><ul role="menu">' +
+      '<li data-testid="search-sdui-query-autocomplete" data-label="gta 6 ending"><a role="menuitem">gta 6 ending</a></li>' +
+      '</ul></div>';
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const suggestion = shadow.querySelector('li')!;
     expect(viewItem(suggestion).state).not.toBe('shown');
     await settle();
     expect(viewItem(suggestion)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+  });
+
+  it('checks every row of the empty search box: trending searches and communities, and recent searches', async () => {
+    renderPage(searchTrending);
+    await settle();
+    const rows = Array.from(searchBox().querySelectorAll(ROW));
+    expect(rows.length).toBeGreaterThan(8);
+    expect(rows.filter((row) => viewItem(row).state === 'withheld')).toEqual([]);
+
+    // Rows as Reddit draws them, with no test id: a trending search, and a recent one scoped to a subreddit.
+    const list = rows[0]!.parentElement!;
+    const row = (label: string) => {
+      const li = document.createElement('li');
+      li.setAttribute('role', 'presentation');
+      li.innerHTML = `<a href="/search/?q=${encodeURIComponent(label)}" role="menuitem"><span><span data-type="search-dropdown-item-label-text">${label}</span></span></a>`;
+      return li;
+    };
+    const trending = row('GTA 6 Gameplay Reveal on South Park');
+    const recent = row('r/GTA6 ending');
+    const other = row('Phantom Blade Zero Launch');
+    list.append(trending, recent, other);
+    await settle();
+
+    expect(viewItem(trending)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(viewItem(recent)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(viewItem(other).state).toBe('shown');
   });
 
   it('covers the community card about GTA 6 beside the feed', () => {

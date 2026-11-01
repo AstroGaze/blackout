@@ -64,8 +64,9 @@ export const reddit: SiteAdapter = {
     card('shreddit-comment-tree-ad'),
     card('shreddit-comments-page-ad'),
     card('shreddit-sidebar-ad'),
-    // Search suggestions: queries, communities and users, in the search box's shadow root.
-    inline('li[data-testid^="search-sdui-"]'),
+    // Every row of the search box's dropdown, in its shadow root: suggestions as you type,
+    // and before you do, trending searches and communities and your recent searches.
+    inline('#search-dropdown-results-container li'),
   ],
   shadowHosts: ['reddit-search-large'],
   observedAttributes: ['post-title'],

@@ -24,7 +24,8 @@ const project = (test: TestProjectInlineConfiguration['test']): TestProjectInlin
 export default defineConfig({
   test: {
     projects: [
-      project({ name: 'pages', exclude: [...configDefaults.exclude, TIMING_TESTS] }),
+      // Saved pages are large, and parsing many at once is slow; speed is the timing tests' job.
+      project({ name: 'pages', exclude: [...configDefaults.exclude, TIMING_TESTS], testTimeout: 20_000 }),
       // Run after the others, on their own.
       project({ name: 'timing', include: [TIMING_TESTS], sequence: { groupOrder: 1 } }),
     ],

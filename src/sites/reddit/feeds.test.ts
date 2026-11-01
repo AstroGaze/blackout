@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { startPageGuard, type PageGuard } from '@/guard/page-guard';
 import { protectionState } from '@/protection/state';
-import { isKeyboardReachable, renderPage, settle, viewPage } from '@/test/page';
+import { clickPageCoverButton, isKeyboardReachable, renderPage, settle, viewPage } from '@/test/page';
 import { gta6, stateWithTopics } from '@/test/state';
 import { reddit } from './adapter';
 import homeFeed from './fixtures/home-feed.html?raw';
@@ -58,6 +58,14 @@ describe('the Reddit home feed with the ready-made GTA 6 topic', () => {
     expect(isKeyboardReachable(posts[0]!.querySelector('[slot="title"]')!)).toBe(false);
   });
 
+  it('covers a post that spells the game "Grand Theft Auto 6"', async () => {
+    const post = redditPost('Rockstar Games have begun to distribute review code of Grand Theft Auto 6');
+    feed().append(post);
+    await settle();
+
+    expect(viewItem(post)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+  });
+
   it('shows a post with only a Weak Term outside the topic’s own subreddit', async () => {
     const post = redditPost('Jason looks different now', { subreddit: 'r/pics' });
     feed().append(post);
@@ -68,7 +76,15 @@ describe('the Reddit home feed with the ready-made GTA 6 topic', () => {
 });
 
 describe('r/GTA6, the topic’s own subreddit', () => {
-  beforeEach(() => open(subreddit, '/r/GTA6/'));
+  beforeEach(async () => {
+    await open(subreddit, '/r/GTA6/');
+    // The whole subreddit is about GTA 6, so it is covered until the user continues.
+    expect(viewPage()).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    clickPageCoverButton('Continue to page');
+    await settle();
+    clickPageCoverButton('Continue');
+    await settle();
+  });
 
   it('covers the posts that name GTA 6 and shows the rest', () => {
     expect(coveredTitles(POST)).toEqual(

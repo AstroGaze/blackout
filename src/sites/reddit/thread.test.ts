@@ -98,7 +98,10 @@ describe('a Reddit thread about GTA 6', () => {
     await continueToPage();
 
     expect(coveredTitles('reddit-pdp-right-rail-post').length).toBeGreaterThan(5);
-    expect(coveredTitles('#answers-suggested-queries-pdp a')).toContain('GTA 6 launch trailer details');
+    // The whole box: its questions, and the answer Reddit opens under one.
+    const suggestedQuestions = document.querySelector('aside#answers-suggested-queries-pdp')!;
+    expect(suggestedQuestions.getAttribute('data-blackout')).toBe('covered');
+    expect(viewItem(suggestedQuestions)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
   });
 });
 

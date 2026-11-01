@@ -92,6 +92,24 @@ Implemented: a Reddit site adapter (`src/sites/reddit/adapter.ts`) and content s
   - **Checked live:** the trending GTA 6 row is covered.
 - **Still open, signed-in only:** the row of recent communities at the top of the empty box, and the "Recent posts" panel on the home sidebar, only show when signed in. Headless Brave can't sign in, and Claude in Chrome refuses reddit.com. They need the user to copy their markup from their own browser.
 
+**Leak audit (2026-10-31):**
+- **The method:** at the user's request to cover every case, a script opened about 25 kinds of Reddit page and state in headless Brave with Blackout protecting GTA 6. It listed every readable text naming GTA 6 with a Strong Term that no cover hid, and where it sat.
+- **The pages:** home, popular, all, news and explore; r/GTA6 (hot, new, top, its wiki); r/gaming and r/GamingLeaksAndRumours; threads, before and after continuing, with replies opened and hover cards; search for posts, communities, comments, people and media; a user's profile and comments; and the search box, empty and typed.
+- **Why not Firecrawl:** it was suggested, but it fetches pages logged out like headless Brave, can't open menus or hover, and getting past Reddit's limits on scrapers is what ticket 10 ruled out. Claude in Chrome refuses reddit.com.
+- **Gaps it found, all fixed:**
+  - **Search results pages:** posts, comments, communities, people and media results; Reddit Answers' summary and its sources line; and related searches. Snapshots: `search-results.html`, `search-comments.html`, `search-media.html`.
+  - **A subreddit's own pages:** feeds, wiki and about pages are now a page subject, from the subreddit's name, title and description, so a topic's subreddit gets the full-page cover. r/popular and r/all are left out. Snapshot: `subreddit-header.html`.
+  - **The community box:** beside a thread (`aside[aria-label="Community information"]`) and everything beside a subreddit's feed (rules, resource links). Its name and description come from the header's attributes, since it draws them inside its shadow root.
+  - **"People also ask about":** the whole box beside a thread, with the answer Reddit opens under a question.
+  - **Profiles:** comments on a user's profile (`shreddit-profile-comment`), and the links, communities and trophies beside them. Snapshot: `user-profile.html`.
+  - **A term:** "Grand Theft Auto 6" was missing from the GTA 6 preset. It's added, and an update now adds preset terms a stored copy lacks, only adding, like a refresh.
+- **Tests:** they assert that no readable text names GTA 6 on each new snapshot, using a `readableText` helper that walks open shadow roots and skips text only screen readers get.
+- **Tests' time limit:** page-seam tests now allow 20 s. Several large snapshots parsed in parallel ran past Vitest's 5 s default under load (GTA V was running).
+- **Left on purpose:**
+  - Image descriptions (alt text), which only screen readers read; the blur-all-thumbnails switch is YouTube only.
+  - Text only for screen readers.
+  - The search box's "r/GTA6" scope chip on a page the user continued to; it sits in a shadow root nested inside the search box's.
+
 **Not done:**
 - **Usernames:** a comment's author name, above its text, isn't checked or covered.
 - **Untested surfaces:** no snapshot was taken of a search results page or of r/popular. Their posts are `shreddit-post` too, but that wasn't checked live.

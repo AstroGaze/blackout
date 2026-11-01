@@ -91,6 +91,7 @@ export const GTA6_PRESET: ProtectedTopic = {
     term('GTA 6', 'strong'),
     term('GTA VI', 'strong'),
     term('Grand Theft Auto VI', 'strong'),
+    term('Grand Theft Auto 6', 'strong'),
     term('#GTA6', 'strong'),
     term('Leonida', 'strong'),
     term('Jason', 'weak'),

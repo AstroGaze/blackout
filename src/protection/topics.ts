@@ -1,6 +1,7 @@
 import { normalize } from '@/matcher/matcher';
 import { COMMON_WORDS_BY_LANGUAGE } from './common-words';
 import {
+  GTA6_PRESET,
   isPaused,
   protectionState,
   type ProtectedTopic,
@@ -167,6 +168,17 @@ export function aiTermsByLevel(topic: ProtectedTopic): Record<SpoilerLevel, Rela
  */
 export function sameTerm(a: string, b: string): boolean {
   return normalize(a) === normalize(b);
+}
+
+/**
+ * Adds the ready-made GTA 6 topic's terms that its stored copy lacks, as when a
+ * newer Blackout ships more of them. Like a refresh, it only adds.
+ */
+export function addMissingPresetTerms(state: ProtectionState): ProtectionState {
+  return changeTopic(state, GTA6_PRESET.id, (topic) => {
+    const missing = GTA6_PRESET.terms.filter((preset) => !topic.terms.some((term) => sameTerm(term.text, preset.text)));
+    return missing.length === 0 ? topic : { ...topic, terms: [...topic.terms, ...structuredClone(missing)] };
+  });
 }
 
 /** Whether `term` is the user's own copy of `text`, compared as the matcher reads it. */

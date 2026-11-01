@@ -1,5 +1,6 @@
 import { BLOCK_MENU_ENTRIES, blockSourceUnderPointer, listenForSourceRequests } from '@/protection/blocked-sources';
 import { listenForHiddenItems } from '@/protection/suggested-blocks';
+import { addMissingPresetTerms, updateProtection } from '@/protection/topics';
 import { startBackgroundRefresh } from '@/refresh/schedule';
 
 export default defineBackground(() => {
@@ -9,7 +10,9 @@ export default defineBackground(() => {
 
   // "Block this channel" on any YouTube video, Short or comment; "Block this
   // subreddit" and "Block this user" on any Reddit post or comment.
-  browser.runtime.onInstalled.addListener(async () => {
+  browser.runtime.onInstalled.addListener(async ({ reason }) => {
+    // A newer Blackout can ship more terms for the ready-made topic.
+    if (reason === 'update') await updateProtection(addMissingPresetTerms);
     await browser.contextMenus.removeAll();
     for (const entry of BLOCK_MENU_ENTRIES) {
       browser.contextMenus.create({

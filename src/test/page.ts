@@ -105,6 +105,44 @@ function coverLabel(item: Element): string | null {
   return coverOf(item)?.querySelector('[data-slot="cover-topic"]')?.textContent ?? null;
 }
 
+/**
+ * The text on the page matching `pattern` that a user can read: not hidden, and
+ * not under a cover. Open shadow roots count. `ignore` names elements no one sees,
+ * such as text only for screen readers.
+ */
+export function readableText(pattern: RegExp, { ignore }: { ignore?: string } = {}): string[] {
+  const view = document.defaultView ?? window;
+  const readable = (element: Element) => {
+    for (let current: Element | null = element; current; ) {
+      if (current.localName === COVER_TAG || current.localName === PAGE_COVER_TAG) return false;
+      if (current.getAttribute('data-blackout') === 'covered' || (current as HTMLElement).hidden) return false;
+      if (ignore && current.matches(ignore)) return false;
+      if (view.getComputedStyle(current).visibility === 'hidden') return false;
+      const root = current.getRootNode();
+      current = current.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+    }
+    return true;
+  };
+  const found: string[] = [];
+  const walk = (root: Node) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const shadow = (node as Element).shadowRoot;
+        if (shadow) walk(shadow);
+        continue;
+      }
+      const text = (node.nodeValue ?? '').replace(/\s+/g, ' ').trim();
+      const parent = node.parentElement;
+      if (text && pattern.test(text) && parent && !['SCRIPT', 'STYLE', 'TEMPLATE'].includes(parent.tagName) && readable(parent)) {
+        found.push(text);
+      }
+    }
+  };
+  walk(document.body);
+  return found;
+}
+
 /** Whether `element` looks blurred: it or an element around it has a blur filter. */
 export function isBlurred(element: Element): boolean {
   const view = element.ownerDocument.defaultView ?? window;

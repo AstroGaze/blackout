@@ -1,11 +1,24 @@
 import type { BlockedSource, SourceId } from '@/protection/state';
 import { subredditSource } from '@/protection/subreddits';
-import { readText, type ItemKind, type SiteAdapter } from '../adapter';
+import { readText, type ItemKind, type PageSubject, type SiteAdapter } from '../adapter';
 
 const card = (selector: string): ItemKind => ({ selector, cover: 'card' });
 const inline = (selector: string): ItemKind => ({ selector, cover: 'inline' });
 
 const POST = 'shreddit-post, shreddit-ad-post';
+const SUBREDDIT_HEADER = 'shreddit-subreddit-header';
+
+/** What a subreddit's header shows: its name, title and description. */
+function subredditHeaderText(header: Element): string {
+  return ['prefixed-name', 'display-name', 'description'].map((name) => header.getAttribute(name) ?? '').join(' ');
+}
+
+/** The post or comment a link points to, as Reddit names them ("t3_…", "t1_…"). */
+function linkedThing(href: string | null): string | null {
+  const match = href && /\/comments\/([a-z0-9]+)(?:\/[^/]*)?(?:\/comment\/([a-z0-9]+))?/i.exec(href);
+  if (!match) return null;
+  return match[2] ? `t1_${match[2].toLowerCase()}` : `t3_${match[1]!.toLowerCase()}`;
+}
 
 /** A Reddit user as a source, from their name with or without "u/". */
 function userSource(name: string | null): BlockedSource | null {
@@ -41,6 +54,23 @@ function distinctSources(sources: (BlockedSource | null)[]): BlockedSource[] {
   );
 }
 
+/**
+ * A subreddit's own pages (its feeds, wiki and about pages) are about the
+ * subreddit: its name, title and description say what that is.
+ */
+function subredditPageSubject(doc: Document, path: string): PageSubject | null {
+  const source = subredditSource(/^\/r\/([^/]+)/.exec(path)?.[1]);
+  if (!source) return null;
+  // Popular and All are feeds of every subreddit, not one.
+  if (['r/popular', 'r/all'].includes(source.account)) return null;
+  const header = doc.querySelector(SUBREDDIT_HEADER);
+  return {
+    key: source.account,
+    text: [source.name, header ? subredditHeaderText(header) : ''].join(' '),
+    sources: [source],
+  };
+}
+
 /** A post's subreddit, then its author. */
 function postSources(post: Element): BlockedSource[] {
   return distinctSources([subredditSource(post.getAttribute('subreddit-prefixed-name')), userSource(post.getAttribute('author'))]);
@@ -58,8 +88,8 @@ export const reddit: SiteAdapter = {
     card('community-card'),
     card('community-highlight-card'),
     card('reddit-pdp-right-rail-post'),
-    // "People also ask about" questions beside a thread.
-    inline('#answers-suggested-queries-pdp a'),
+    // "People also ask about" beside a thread: its questions, and the answer it opens under one.
+    card('aside#answers-suggested-queries-pdp'),
     // Ads among a thread's comments and beside the feed.
     card('shreddit-comment-tree-ad'),
     card('shreddit-comments-page-ad'),
@@ -67,10 +97,34 @@ export const reddit: SiteAdapter = {
     // Every row of the search box's dropdown, in its shadow root: suggestions as you type,
     // and before you do, trending searches and communities and your recent searches.
     inline('#search-dropdown-results-container li'),
+    // Search results: posts, comments, communities, people and media, Reddit Answers'
+    // summary of them, and related searches.
+    card('[data-testid="search-post-unit"]'),
+    card('[data-testid="search-post-with-content-preview"]'),
+    card('[data-testid="search-sdui-post"]'),
+    card('[data-testid="sdui-post-unit"]'),
+    card('[data-testid="search-sdui-comment-unit"]'),
+    card('[data-testid="search-community"]'),
+    card('[data-testid="search-author"]'),
+    card('[data-id="search-media-post-unit"]'),
+    card('[id^="section_"][id*="answers"]'),
+    inline('[data-testid="sources-header"]'),
+    inline('a[data-testid="search-sdui-query-suggestion"]'),
+    // A user's profile: their comments, and the links, communities and trophies beside them.
+    card('shreddit-profile-comment'),
+    inline('aside[aria-label="Profile information"] li'),
+    // The community's box beside its threads, and everything beside its feed: name,
+    // description, rules and links.
+    card('aside[aria-label="Community information"]'),
+    card('#subreddit-right-rail__partial'),
   ],
   shadowHosts: ['reddit-search-large'],
   observedAttributes: ['post-title'],
-  itemText: readText,
+  itemText(item) {
+    // A community box draws its name and description from attributes, inside its shadow root.
+    const headers = [item, ...item.querySelectorAll(SUBREDDIT_HEADER)].filter((element) => element.matches(SUBREDDIT_HEADER));
+    return [readText(item), ...headers.map(subredditHeaderText)].join(' ');
+  },
   itemSources(item) {
     const post = item.closest(POST);
     if (post) return postSources(post);
@@ -87,11 +141,18 @@ export const reddit: SiteAdapter = {
     if (post) return post.getAttribute('id') ?? post.getAttribute('permalink');
     const comment = item.closest('shreddit-comment');
     if (comment) return comment.getAttribute('thingid');
+    if (item.matches('shreddit-profile-comment')) return item.getAttribute('comment-id');
+    // Search results and other cards link the post or comment they show.
+    for (const link of [item, ...item.querySelectorAll('a[href]')]) {
+      const thing = linkedThing(link.getAttribute('href'));
+      if (thing) return thing;
+    }
     return null;
   },
   pageSubject(doc) {
-    const match = /^\/r\/([^/]+)\/comments\/([a-z0-9]+)/i.exec(new URL(doc.location.href).pathname);
-    if (!match) return null;
+    const path = new URL(doc.location.href).pathname;
+    const match = /^\/r\/([^/]+)\/comments\/([a-z0-9]+)/i.exec(path);
+    if (!match) return subredditPageSubject(doc, path);
     const [, subreddit, postId] = match;
     // The same key as the thread's own post, so seeing both counts once.
     const key = `t3_${postId!.toLowerCase()}`;

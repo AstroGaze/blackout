@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gta6, stateWithTopics } from '@/test/state';
 import { GTA6_PRESET } from './state';
 import {
+  addMissingPresetTerms,
   addTopic,
   addUserTerm,
   aiTermsByLevel,
@@ -98,6 +99,27 @@ describe('storing your own Related Terms', () => {
   });
 });
 
+describe('bringing the ready-made GTA 6 topic up to date after an update', () => {
+  it('adds the preset terms it is missing, and keeps everything it has', () => {
+    const stored = gta6();
+    stored.terms = stored.terms.filter((term) => term.text !== 'Grand Theft Auto 6');
+    stored.terms.push({ text: 'Rockstar’s new game', level: 'common', strength: 'strong', language: 'en', addedBy: 'user' });
+    stored.enabled = false;
+
+    const [updated] = addMissingPresetTerms(stateWithTopics(stored)).topics;
+
+    expect(updated!.terms.map((term) => term.text)).toEqual(
+      expect.arrayContaining(['Grand Theft Auto 6', 'Rockstar’s new game', 'GTA 6']),
+    );
+    expect(updated!.terms).toHaveLength(GTA6_PRESET.terms.length + 1);
+    expect(updated!.enabled).toBe(false);
+  });
+
+  it('leaves a deleted preset deleted', () => {
+    expect(addMissingPresetTerms(stateWithTopics()).topics).toEqual([]);
+  });
+});
+
 describe('Related Terms grouped by Spoiler Level for the term viewer', () => {
   it('puts the GTA 6 preset’s seeded terms under their levels', () => {
     const levels = aiTermsByLevel(gta6());
@@ -106,6 +128,7 @@ describe('Related Terms grouped by Spoiler Level for the term viewer', () => {
       'GTA 6',
       'GTA VI',
       'Grand Theft Auto VI',
+      'Grand Theft Auto 6',
       '#GTA6',
       'Leonida',
       'Jason',

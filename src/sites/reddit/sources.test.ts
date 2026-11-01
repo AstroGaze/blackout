@@ -146,7 +146,10 @@ describe('Blocked Sources on Reddit', () => {
     // The thread and its own post are one item; its comments count for their authors only.
     const tallies = Object.values((await suggestedBlockCounts.getValue()).tallies);
     const itemsOf = (account: string) => tallies.find((tally) => tally.source.account === account)?.itemKeys;
-    expect(itemsOf('r/gta6')).toEqual(['t3_1x6l1y5']);
+    // Related posts beside it from r/GTA6 count too, each once.
+    const subredditItems = itemsOf('r/gta6')!;
+    expect(subredditItems.filter((key) => key === 't3_1x6l1y5')).toHaveLength(1);
+    expect(new Set(subredditItems).size).toBe(subredditItems.length);
     expect(itemsOf('u/pastacheed')).toEqual(['t3_1x6l1y5']);
     expect(itemsOf('u/troublerecent7320')).toHaveLength(1);
   });

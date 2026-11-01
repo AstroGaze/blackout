@@ -90,7 +90,11 @@ Implemented: a Reddit site adapter (`src/sites/reddit/adapter.ts`) and content s
   - **The gap:** before anything is typed, the box shows trending searches and, when signed in, recent searches. Their rows carry no `data-testid`, so `li[data-testid^="search-sdui-"]` missed them, and "GTA 6 Gameplay Reveal on South Park" showed in Trending.
   - **The fix:** the item is now every row of the dropdown (`#search-dropdown-results-container li`), an id found only inside the search box. A new snapshot of the empty box (`search-trending.html`) tests it, along with rows shaped like Reddit's trending and recent ones.
   - **Checked live:** the trending GTA 6 row is covered.
-- **Still open, signed-in only:** the row of recent communities at the top of the empty box, and the "Recent posts" panel on the home sidebar, only show when signed in. Headless Brave can't sign in, and Claude in Chrome refuses reddit.com. They need the user to copy their markup from their own browser.
+- **Signed-in only, fixed on 2026-11-01:** the user copied the markup from their own browser with a Console snippet; Claude in Chrome and the app's browser pane both refuse reddit.com.
+  - **Recent communities:** a row of tiles at the top of the empty box (`[data-suggested-subreddit-dismiss-item]`).
+  - **Recent searches:** `.recent-search-item-container`. The query is drawn inside the item's own nested shadow root, so the text checked includes its delete button's label ("Delete r/GTA6 ending from recent searches").
+  - **"Recent posts":** the panel beside the home feed (`recent-posts [slot="posts"] > div`), whose rows show the subreddit and the title.
+  - **Tests:** they use hand-built markup in the same shape. The capture itself holds the user's account id and history, so it isn't saved.
 
 **Leak audit (2026-10-31):**
 - **The method:** at the user's request to cover every case, a script opened about 25 kinds of Reddit page and state in headless Brave with Blackout protecting GTA 6. It listed every readable text naming GTA 6 with a Strong Term that no cover hid, and where it sat.

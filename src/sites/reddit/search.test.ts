@@ -123,6 +123,40 @@ describe('Reddit search suggestions for "gta"', () => {
     expect(viewItem(other).state).toBe('shown');
   });
 
+  it('covers what a signed-in user’s empty search box shows: recent communities and recent searches', async () => {
+    renderPage(searchTrending);
+    await settle();
+    const results = searchBox().querySelector('#search-dropdown-results-container ul')!;
+    // Shaped like Reddit's, as captured from a signed-in browser.
+    const recentCommunity = (name: string) => {
+      const tile = document.createElement('div');
+      tile.setAttribute('data-suggested-subreddit-dismiss-item', '');
+      tile.innerHTML = `<a aria-label="r/${name}" data-testid="search-sdui-typeahead-row-community-item" href="/r/${name}/" role="menuitem"><span>r/${name}</span></a><button aria-label="Remove r/${name}" type="button"></button>`;
+      return tile;
+    };
+    const recentSearch = (label: string) => {
+      const row = document.createElement('div');
+      row.className = 'recent-search-item-container';
+      // The query itself is drawn inside the item's own shadow root; the delete button names it.
+      row.innerHTML = `<search-telemetry-tracker><recent-search-item><search-telemetry-tracker slot="dismiss-button-container"><button aria-label="Delete ${label} from recent searches"></button></search-telemetry-tracker></recent-search-item></search-telemetry-tracker>`;
+      return row;
+    };
+    const communities = document.createElement('div');
+    communities.className = 'search-sdui-typeahead-row';
+    const gta6Community = recentCommunity('GTA6');
+    const otherCommunity = recentCommunity('aviation');
+    communities.append(gta6Community, otherCommunity);
+    const gta6Search = recentSearch('r/GTA6 ending');
+    const otherSearch = recentSearch('deadlock');
+    results.prepend(communities, gta6Search, otherSearch);
+    await settle();
+
+    expect(viewItem(gta6Community)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(viewItem(otherCommunity).state).toBe('shown');
+    expect(viewItem(gta6Search)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(viewItem(otherSearch).state).toBe('shown');
+  });
+
   it('covers the community card about GTA 6 beside the feed', () => {
     const card = Array.from(document.querySelectorAll('community-card')).find((each) => each.textContent?.includes('r/GTA6'))!;
     expect(viewItem(card)).toMatchObject({ state: 'covered', reason: 'GTA 6' });

@@ -97,6 +97,11 @@ export const reddit: SiteAdapter = {
     // Every row of the search box's dropdown, in its shadow root: suggestions as you type,
     // and before you do, trending searches and communities and your recent searches.
     inline('#search-dropdown-results-container li'),
+    // Signed in, the empty box also shows recent communities as tiles, and recent searches.
+    card('[data-suggested-subreddit-dismiss-item]'),
+    inline('.recent-search-item-container'),
+    // A signed-in user's recent posts beside the home feed.
+    card('recent-posts [slot="posts"] > div'),
     // Search results: posts, comments, communities, people and media, Reddit Answers'
     // summary of them, and related searches.
     card('[data-testid="search-post-unit"]'),
@@ -123,7 +128,11 @@ export const reddit: SiteAdapter = {
   itemText(item) {
     // A community box draws its name and description from attributes, inside its shadow root.
     const headers = [item, ...item.querySelectorAll(SUBREDDIT_HEADER)].filter((element) => element.matches(SUBREDDIT_HEADER));
-    return [readText(item), ...headers.map(subredditHeaderText)].join(' ');
+    // A recent search draws its query inside its own shadow root; its delete button names it.
+    const labels = item.matches('.recent-search-item-container')
+      ? Array.from(item.querySelectorAll('[aria-label]'), (element) => element.getAttribute('aria-label'))
+      : [];
+    return [readText(item), ...headers.map(subredditHeaderText), ...labels].join(' ');
   },
   itemSources(item) {
     const post = item.closest(POST);

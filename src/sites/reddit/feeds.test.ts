@@ -66,6 +66,21 @@ describe('the Reddit home feed with the ready-made GTA 6 topic', () => {
     expect(viewItem(post)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
   });
 
+  it('covers the recent posts beside the feed that are about GTA 6', async () => {
+    // Shaped like Reddit's signed-in sidebar: a subreddit link, then the title.
+    const recentPosts = document.createElement('recent-posts');
+    const row = (subreddit: string, title: string, id: string) =>
+      `<div class="mx-md"><div><div class="flex"><a href="https://www.reddit.com/r/${subreddit}/"><div class="ms-xs truncate">r/${subreddit}</div></a></div>` +
+      `<a href="/r/${subreddit}/comments/${id}/post/"><div post-id="t3_${id}"><h3>${title}</h3></div></a></div></div><hr>`;
+    recentPosts.innerHTML = `<div slot="posts">${row('GTA6', 'To those who are working on Nov 19, are you staying up to play?', 'aaa111')}${row('aviation', 'Crash near me', 'bbb222')}</div>`;
+    document.body.append(recentPosts);
+    await settle();
+
+    const [gta, other] = Array.from(recentPosts.querySelectorAll('[slot="posts"] > div'));
+    expect(viewItem(gta!)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(viewItem(other!).state).toBe('shown');
+  });
+
   it('shows a post with only a Weak Term outside the topic’s own subreddit', async () => {
     const post = redditPost('Jason looks different now', { subreddit: 'r/pics' });
     feed().append(post);

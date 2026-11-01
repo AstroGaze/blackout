@@ -125,7 +125,6 @@ Implemented: a Reddit site adapter (`src/sites/reddit/adapter.ts`) and content s
 
 **Not done:**
 - **Usernames:** a comment's author name, above its text, isn't checked or covered.
-- **Untested surfaces:** no snapshot was taken of a search results page or of r/popular. Their posts are `shreddit-post` too, but that wasn't checked live.
-- **Hover cards:** the cards Reddit shows when hovering a user or subreddit name aren't checked.
-- **Sidebar:** a subreddit's own description and rules aren't checked.
+- **r/popular:** it has no snapshot. Its posts are `shreddit-post` too, and the leak audit found nothing readable there.
+- **Hover cards:** the cards Reddit shows when hovering a user or subreddit name aren't checked as items of their own.
 - **Mobile and old Reddit:** `m.reddit.com` and `old.reddit.com` aren't handled.

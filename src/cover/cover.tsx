@@ -99,30 +99,33 @@ export function Cover({ layout, reason, opaque = false, onReveal, onBlockSource,
       role="group"
       aria-label={label}
       className={cn(
-        'dark flex size-full flex-col items-center justify-center gap-3 rounded-xl p-4 text-center text-foreground',
+        'dark size-full rounded-xl text-center text-foreground [container:cover/size]',
         opaque ? 'bg-background' : 'bg-background/75',
       )}
     >
-      <Icon className="size-5 text-muted-foreground" aria-hidden />
-      <div className="space-y-0.5">
-        {!blocked && <p className="text-xs text-muted-foreground">Hidden for</p>}
-        <p className="text-sm">{title}</p>
-        {blocked && <p className="truncate text-xs text-muted-foreground">{reason.sourceName}</p>}
-      </div>
-      {confirming ? (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-xs text-muted-foreground">{warning}</p>
-          <div className="flex gap-2">
-            {cancel}
-            {show}
+      {/* Over a small item, only the topic and the buttons that reveal it fit; over a tall one, it sits near the top. */}
+      <div className="flex size-full flex-col items-center justify-center gap-3 overflow-hidden p-4 compact:gap-1.5 compact:p-1.5 tall:justify-start tall:pt-20">
+        <Icon className="size-5 shrink-0 text-muted-foreground compact:hidden" aria-hidden />
+        <div className="max-w-full space-y-0.5">
+          {!blocked && <p className="text-xs text-muted-foreground compact:hidden">Hidden for</p>}
+          <p className="truncate text-sm compact:text-xs">{title}</p>
+          {blocked && <p className="truncate text-xs text-muted-foreground compact:hidden">{reason.sourceName}</p>}
+        </div>
+        {confirming ? (
+          <div className="flex flex-col items-center gap-2 compact:gap-1">
+            <p className="text-xs text-muted-foreground compact:hidden">{warning}</p>
+            <div className="flex flex-wrap justify-center gap-2 compact:gap-1">
+              {cancel}
+              {show}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap justify-center gap-2">
-          {reveal}
-          {sourceAction}
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-wrap justify-center gap-2">
+            {reveal}
+            {sourceAction && <span className="contents compact:hidden">{sourceAction}</span>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

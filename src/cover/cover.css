@@ -4,6 +4,26 @@
 @source '../components';
 @source './';
 
+/*
+ * A card cover over a small item, such as a community tile in a search box,
+ * keeps only the topic and Reveal. The cover's root is the "cover" container.
+ */
+@custom-variant compact {
+  @container cover (max-width: 200px) or (max-height: 170px) {
+    @slot;
+  }
+}
+
+/*
+ * A card cover over a tall item, such as a subreddit's sidebar, keeps its label
+ * near the top, where it shows, rather than in the middle, which may be far below.
+ */
+@custom-variant tall {
+  @container cover (min-height: 480px) {
+    @slot;
+  }
+}
+
 @layer base {
   :host {
     font-family: var(--font-sans);

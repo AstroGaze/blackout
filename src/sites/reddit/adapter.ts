@@ -86,6 +86,9 @@ export const reddit: SiteAdapter = {
     inline('shreddit-comment [slot="comment"]'),
     // Suggested communities, a subreddit's highlights, and related posts beside a thread.
     card('community-card'),
+    // A highlight by the link around it: the card draws itself in a shadow root
+    // with no room for a cover, and may do so only after it is covered.
+    card('community-highlight-carousel a[href*="/comments/"]'),
     card('community-highlight-card'),
     card('reddit-pdp-right-rail-post'),
     // "People also ask about" beside a thread: its questions, and the answer it opens under one.

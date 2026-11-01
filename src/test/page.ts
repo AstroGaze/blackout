@@ -98,7 +98,11 @@ export function shownTitles(selector: string, titleOf: TitleOf = wholeText, root
     .map((view) => view.title);
 }
 
-const coverOf = (item: Element) => item.querySelector(COVER_TAG)?.shadowRoot ?? null;
+/** The cover over `item`: beside its content, or inside its shadow root when the site wouldn't show it beside. */
+const coverOf = (item: Element) => {
+  const inShadow = Array.from(item.shadowRoot?.children ?? []).find((child) => child.localName === COVER_TAG);
+  return (item.querySelector(`:scope > ${COVER_TAG}`) ?? inShadow ?? item.querySelector(COVER_TAG))?.shadowRoot ?? null;
+};
 
 /** The topic named on the cover over `item`, or null if it isn't covered. */
 function coverLabel(item: Element): string | null {

@@ -123,7 +123,7 @@ describe('r/GTA6, the topic’s own subreddit', () => {
   });
 
   it('covers the community highlights that name GTA 6', () => {
-    expect(coveredTitles('community-highlight-card')).toEqual(
+    expect(coveredTitles('community-highlight-carousel a[href*="/comments/"]')).toEqual(
       expect.arrayContaining([expect.stringContaining('GTA 6 Launch Trailer')]),
     );
   });

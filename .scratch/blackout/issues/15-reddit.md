@@ -114,6 +114,15 @@ Implemented: a Reddit site adapter (`src/sites/reddit/adapter.ts`) and content s
   - Text only for screen readers.
   - The search box's "r/GTA6" scope chip on a page the user continued to; it sits in a shadow root nested inside the search box's.
 
+**How covers look, from the user's screenshots (2026-11-01):**
+- **Small items:** a card cover narrower than 200 px or shorter than 170 px, such as a recent-community tile in the search box, keeps only the topic and Reveal. It drops the icon, "Hidden for" and "Block source", which stays in the right-click menu. This uses a `compact` container-query variant in `cover.css`.
+- **Tall items:** a card cover at least 480 px tall puts its label near the top (`tall` variant) instead of the middle, which could be far below the screen. A subreddit's sidebar is one item about 5,000 px tall.
+- **Items drawn in their own shadow root:** these show a cover only if their shadow root has a default slot.
+  - **When the cover goes inside:** if there's no default slot, the cover goes inside the shadow root, opaque, since the site's content there can't be blurred.
+  - **Drawn later:** if the element hasn't been drawn yet when it's covered, the cover checks every 50 ms for 5 s and moves inside if needed.
+  - **Highlights:** they are now covered by the link around each card, which always shows the cover.
+- **Not reproduced:** the user's r/GTA6 screenshot also had a blank top of the page (no header or banner). That didn't happen logged out in headless Brave.
+
 **Not done:**
 - **Usernames:** a comment's author name, above its text, isn't checked or covered.
 - **Untested surfaces:** no snapshot was taken of a search results page or of r/popular. Their posts are `shreddit-post` too, but that wasn't checked live.

@@ -52,7 +52,7 @@ function ensureDocumentCss(doc: Document) {
  * can't reach it, and appends the host to `parent`.
  */
 function mountInShadow(
-  parent: Element,
+  parent: Element | ShadowRoot,
   tag: string,
   hostStyles: Record<string, string>,
   ui: ReactNode,
@@ -94,16 +94,62 @@ function unmount(mounted: Mounted | undefined) {
 
 const itemCovers = new WeakMap<Element, Mounted>();
 
-/** Places a cover over `item`. */
+/**
+ * Whether the site would show a cover added to `item` as a child. An item that
+ * draws itself in a shadow root shows only the children its slots take in.
+ */
+function showsChildren(item: Element): boolean {
+  return item.shadowRoot === null || item.shadowRoot.querySelector('slot:not([name])') !== null;
+}
+
+/**
+ * Places a cover over `item`. When the site wouldn't show it as a child, it goes
+ * inside the item's shadow root instead, opaque, since what the site draws there
+ * isn't blurred.
+ */
 export function mountCover(item: Element, props: CoverProps): void {
   unmountCover(item);
+  const beside = showsChildren(item);
   const mounted = mountInShadow(
-    item,
+    beside ? item : item.shadowRoot!,
     COVER_TAG,
     { position: 'absolute', inset: '0', 'z-index': '10' },
-    <Cover {...props} />,
+    <Cover {...props} opaque={props.opaque || !beside} />,
   );
   itemCovers.set(item, mounted);
+  // A site's own element may draw itself in a shadow root only after the cover is in.
+  if (item.shadowRoot === null && notYetDrawn(item)) moveCoverIfDrawnLater(item, props, mounted);
+}
+
+/** Whether `item` is a site's own element whose code hasn't run yet. */
+function notYetDrawn(item: Element): boolean {
+  if (!item.localName.includes('-')) return false;
+  try {
+    return !item.matches(':defined');
+  } catch {
+    return true;
+  }
+}
+
+/** How long, and how often, to look for an item drawing itself after it is covered. */
+const LATE_DRAW_MS = 5000;
+const LATE_DRAW_CHECK_MS = 50;
+
+/** Moves the cover inside `item`'s shadow root if one appears that wouldn't show it. */
+function moveCoverIfDrawnLater(item: Element, props: CoverProps, mounted: Mounted) {
+  const view = item.ownerDocument.defaultView;
+  if (!view) return;
+  const giveUpAt = Date.now() + LATE_DRAW_MS;
+  const look = () => {
+    // The cover was taken down or replaced meanwhile.
+    if (itemCovers.get(item) !== mounted) return;
+    if (item.shadowRoot) {
+      if (!showsChildren(item)) mountCover(item, props);
+      return;
+    }
+    if (Date.now() < giveUpAt) view.setTimeout(look, LATE_DRAW_CHECK_MS);
+  };
+  view.setTimeout(look, LATE_DRAW_CHECK_MS);
 }
 
 export function unmountCover(item: Element): void {

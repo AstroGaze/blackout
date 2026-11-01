@@ -46,6 +46,19 @@ describe('a subreddit about GTA 6', () => {
     expect(viewPage()).toMatchObject({ state: 'covered', reason: 'GTA 6' });
   });
 
+  it('covers each highlight about GTA 6 by its link, which shows a cover whenever Reddit draws the card', async () => {
+    await open(subredditPage, '/r/GTA6/');
+    clickPageCoverButton('Continue to page');
+    await settle();
+    clickPageCoverButton('Continue');
+    await settle();
+
+    const links = Array.from(document.querySelectorAll('community-highlight-carousel a[href*="/comments/"]'));
+    const trailer = links.find((link) => link.getAttribute('href')?.includes('gta_6_launch_trailer'))!;
+    expect(viewItem(trailer)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+    expect(trailer.querySelector(':scope > blackout-cover')).not.toBeNull();
+  });
+
   it('keeps its sidebar covered after continuing: title, description, rules and links', async () => {
     await open(subredditPage, '/r/GTA6/');
     clickPageCoverButton('Continue to page');
@@ -54,6 +67,55 @@ describe('a subreddit about GTA 6', () => {
     await settle();
 
     expect(viewItem(document.querySelector('#subreddit-right-rail__partial')!)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+  });
+});
+
+describe('a covered item that draws itself in its own shadow root', () => {
+  it('shows its cover there, opaque, since the site would never show a cover added beside its content', async () => {
+    history.replaceState(null, '', '/');
+    guard = startPageGuard(reddit);
+    // Like a community highlight: text for the page, and a shadow root with no slot for anything else.
+    const card = document.createElement('community-highlight-card');
+    card.innerHTML = '<span>GTA 6 Launch Trailer</span>';
+    card.attachShadow({ mode: 'open' }).innerHTML = '<div class="image">GTA6 wiki</div>';
+    document.body.append(card);
+    await settle();
+
+    expect(viewItem(card).state).toBe('covered');
+    const cover = Array.from(card.shadowRoot!.children).find((child) => child.localName === 'blackout-cover');
+    expect(cover).not.toBeNull();
+    expect(cover!.shadowRoot!.querySelector('[data-slot="cover-topic"]')!.textContent).toBe('GTA 6');
+    expect(cover!.shadowRoot!.querySelector('[role="group"]')!.className).toContain('bg-background');
+    expect(cover!.shadowRoot!.querySelector('[role="group"]')!.className).not.toContain('bg-background/75');
+  });
+
+  it('moves its cover inside when the site draws the item after Blackout has covered it', async () => {
+    history.replaceState(null, '', '/');
+    guard = startPageGuard(reddit);
+    const card = document.createElement('community-highlight-card');
+    card.innerHTML = '<span>GTA 6 Launch Trailer</span>';
+    document.body.append(card);
+    await settle();
+    // The site's code runs later, and draws the card in a shadow root with no slot for the cover.
+    card.attachShadow({ mode: 'open' }).innerHTML = '<div class="image">GTA6 wiki</div>';
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    expect(Array.from(card.shadowRoot!.children).some((child) => child.localName === 'blackout-cover')).toBe(true);
+    expect(card.querySelector(':scope > blackout-cover')).toBeNull();
+    expect(viewItem(card)).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+  });
+
+  it('keeps a cover beside the content when the shadow root shows it, as a post’s does', async () => {
+    history.replaceState(null, '', '/');
+    guard = startPageGuard(reddit);
+    const post = document.createElement('shreddit-post');
+    post.setAttribute('post-title', 'GTA 6 ending');
+    post.innerHTML = '<a slot="title">GTA 6 ending</a>';
+    post.attachShadow({ mode: 'open' }).innerHTML = '<slot name="title"></slot><slot></slot>';
+    document.body.append(post);
+    await settle();
+
+    expect(post.querySelector(':scope > blackout-cover')).not.toBeNull();
   });
 });
 

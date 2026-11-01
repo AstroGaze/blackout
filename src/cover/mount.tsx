@@ -61,7 +61,9 @@ function mountInShadow(
   ensureDocumentCss(doc);
 
   const host = doc.createElement(tag);
-  for (const [property, value] of Object.entries({ display: 'block', ...hostStyles })) {
+  // Sites may hide elements their own code hasn't defined, as Reddit does, and the
+  // host is never defined. It still hides along with what it sits in.
+  for (const [property, value] of Object.entries({ display: 'block', visibility: 'inherit', ...hostStyles })) {
     host.style.setProperty(property, value, 'important');
   }
   // Keep presses and clicks on the cover from reaching the site's own handlers:
@@ -165,7 +167,8 @@ export function mountPageCover(doc: Document, props: PageCoverProps): void {
   const mounted = mountInShadow(
     doc.documentElement,
     PAGE_COVER_TAG,
-    { position: 'fixed', inset: '0', 'z-index': '2147483647' },
+    // Nothing around it should hide it: it's the page's only way forward.
+    { position: 'fixed', inset: '0', 'z-index': '2147483647', visibility: 'visible' },
     <PageCover {...props} />,
   );
   pageCovers.set(doc, mounted);

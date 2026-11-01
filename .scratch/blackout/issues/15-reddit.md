@@ -121,7 +121,13 @@ Implemented: a Reddit site adapter (`src/sites/reddit/adapter.ts`) and content s
   - **When the cover goes inside:** if there's no default slot, the cover goes inside the shadow root, opaque, since the site's content there can't be blurred.
   - **Drawn later:** if the element hasn't been drawn yet when it's covered, the cover checks every 50 ms for 5 s and moves inside if needed.
   - **Highlights:** they are now covered by the link around each card, which always shows the cover.
-- **Not reproduced:** the user's r/GTA6 screenshot also had a blank top of the page (no header or banner). That didn't happen logged out in headless Brave.
+- **The blank r/GTA6 page, fixed:**
+  - **The symptom:** the user's r/GTA6 was blank apart from a few covers and links.
+  - **The cause:** Reddit's stylesheet hides every custom element its code hasn't defined (`:not(:defined) { visibility: hidden }`). Blackout's elements are never defined, since a content script can't define elements. So the page cover, and the covers and toast on its main document, were hidden while the page stayed masked. This happens logged out too.
+  - **Why earlier checks missed it:** the checks clicked the cover's buttons by script, which works on hidden elements, and never confirmed the cover could be seen.
+  - **The fix:** the page cover now sets `visibility: visible` on itself. Covers over items and the toast set `visibility: inherit`, so they still hide along with whatever they sit in.
+  - **Tests:** they now count a cover only if it's visible. A new test puts Reddit's rule on the page. One older test was clicking "Block source" under a masked thread, which a user couldn't see; it now continues to the thread first.
+  - **Covers over items:** happy-dom doesn't resolve `inherit`, so these were checked in headless Brave instead. Screenshots there show the page cover before continuing, and all 6 covers and the toast after.
 
 **Not done:**
 - **Usernames:** a comment's author name, above its text, isn't checked or covered.

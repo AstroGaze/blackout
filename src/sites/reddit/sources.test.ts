@@ -86,6 +86,11 @@ describe('Blocked Sources on Reddit', () => {
     await protectionState.setValue(stateWithTopics(gta6()));
     vi.spyOn(fakeBrowser.tabs, 'sendMessage').mockImplementation(async (_tabId, message) => answerFromPage(message));
     await open(thread, '/r/GTA6/comments/1x6l1y5/gta_6_launch_trailer/');
+    // The thread is about GTA 6, so the user continues to it first.
+    clickPageCoverButton('Continue to page');
+    await settle();
+    clickPageCoverButton('Continue');
+    await settle();
     const post = redditPost('Leonida map leaked', { subreddit: 'r/GTALeaks', author: 'Leaker' });
     const comment = redditComment('Leonida burns at the end', { author: 'Spoiler_Guy' });
     document.querySelector('shreddit-comment-tree')!.append(comment);

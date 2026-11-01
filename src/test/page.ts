@@ -98,10 +98,15 @@ export function shownTitles(selector: string, titleOf: TitleOf = wholeText, root
     .map((view) => view.title);
 }
 
+/** Whether the user could see `host`: a site's stylesheet may hide it, as Reddit's hides elements it doesn't know. */
+const isVisible = (host: Element | null | undefined): host is Element =>
+  !!host && (host.ownerDocument.defaultView ?? window).getComputedStyle(host).visibility !== 'hidden';
+
 /** The cover over `item`: beside its content, or inside its shadow root when the site wouldn't show it beside. */
 const coverOf = (item: Element) => {
   const inShadow = Array.from(item.shadowRoot?.children ?? []).find((child) => child.localName === COVER_TAG);
-  return (item.querySelector(`:scope > ${COVER_TAG}`) ?? inShadow ?? item.querySelector(COVER_TAG))?.shadowRoot ?? null;
+  const host = item.querySelector(`:scope > ${COVER_TAG}`) ?? inShadow ?? item.querySelector(COVER_TAG);
+  return isVisible(host) ? host.shadowRoot : null;
 };
 
 /** The topic named on the cover over `item`, or null if it isn't covered. */
@@ -175,7 +180,10 @@ export type PageView =
   | { title: string; state: 'hidden' }
   | { title: string; state: 'covered'; reason: string };
 
-const pageCover = () => document.querySelector(PAGE_COVER_TAG)?.shadowRoot ?? null;
+const pageCover = () => {
+  const host = document.querySelector(PAGE_COVER_TAG);
+  return isVisible(host) ? host.shadowRoot : null;
+};
 
 /** What the user sees of the page as a whole, including the tab title. */
 export function viewPage(): PageView {

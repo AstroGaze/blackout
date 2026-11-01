@@ -70,6 +70,29 @@ describe('a subreddit about GTA 6', () => {
   });
 });
 
+describe('Reddit’s own stylesheet, which hides every element its code hasn’t defined', () => {
+  beforeEach(() => {
+    const style = document.createElement('style');
+    style.textContent = ':not(:defined) { visibility: hidden; }';
+    document.head.append(style);
+    return () => style.remove();
+  });
+
+  it('still shows the page cover, so the user can continue', async () => {
+    await open(subredditPage, '/r/GTA6/');
+    expect(viewPage()).toMatchObject({ state: 'covered', reason: 'GTA 6' });
+
+    // Only a cover the user can see has buttons to click.
+    clickPageCoverButton('Continue to page');
+    await settle();
+    clickPageCoverButton('Continue');
+    await settle();
+    expect(document.documentElement.hasAttribute('data-blackout-page')).toBe(false);
+  });
+  // Covers over items take their visibility from the item ("inherit"), which happy-dom
+  // doesn't resolve, so they are checked in a real browser instead.
+});
+
 describe('a covered item that draws itself in its own shadow root', () => {
   it('shows its cover there, opaque, since the site would never show a cover added beside its content', async () => {
     history.replaceState(null, '', '/');

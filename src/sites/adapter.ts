@@ -81,6 +81,14 @@ export interface PageSubject {
   sources?: BlockedSource[];
 }
 
+/** The sources that could be read from an item, each once. */
+export function distinctSources(sources: (BlockedSource | null)[]): BlockedSource[] {
+  return sources.filter(
+    (source, index): source is BlockedSource =>
+      source !== null && sources.findIndex((other) => other?.account === source.account) === index,
+  );
+}
+
 /**
  * The text of every text node under `element`, separated by spaces, so text in
  * neighbouring elements (a title and its channel) can't run together into one word.

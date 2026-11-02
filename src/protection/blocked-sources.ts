@@ -78,6 +78,7 @@ export const BLOCK_MENU_ENTRIES = [
   { id: 'block-source', title: 'Block this channel', sites: ['*://www.youtube.com/*'], accountPrefix: '' },
   { id: 'block-subreddit', title: 'Block this subreddit', sites: ['*://www.reddit.com/*'], accountPrefix: 'r/' },
   { id: 'block-reddit-user', title: 'Block this user', sites: ['*://www.reddit.com/*'], accountPrefix: 'u/' },
+  { id: 'block-x-account', title: 'Block this account', sites: ['*://x.com/*'], accountPrefix: '@' },
 ] as const;
 
 /**

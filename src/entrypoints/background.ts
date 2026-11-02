@@ -9,7 +9,8 @@ export default defineBackground(() => {
   listenForHiddenItems();
 
   // "Block this channel" on any YouTube video, Short or comment; "Block this
-  // subreddit" and "Block this user" on any Reddit post or comment.
+  // subreddit" and "Block this user" on any Reddit post or comment; "Block this
+  // account" on any X post.
   browser.runtime.onInstalled.addListener(async ({ reason }) => {
     // A newer Blackout can ship more terms for the ready-made topic.
     if (reason === 'update') await updateProtection(addMissingPresetTerms);

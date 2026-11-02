@@ -1,6 +1,6 @@
 import type { BlockedSource, SourceId } from '@/protection/state';
 import { subredditSource } from '@/protection/subreddits';
-import { readText, type ItemKind, type PageSubject, type SiteAdapter } from '../adapter';
+import { distinctSources, readText, type ItemKind, type PageSubject, type SiteAdapter } from '../adapter';
 
 const card = (selector: string): ItemKind => ({ selector, cover: 'card' });
 const inline = (selector: string): ItemKind => ({ selector, cover: 'inline' });
@@ -44,14 +44,6 @@ function linkSource(href: string | null): BlockedSource | null {
 function pageSubreddit(doc: Document): BlockedSource | null {
   const match = /^\/r\/([^/]+)/.exec(new URL(doc.location.href).pathname);
   return match ? subredditSource(decodeURIComponent(match[1]!)) : null;
-}
-
-/** The sources that could be read, each once. */
-function distinctSources(sources: (BlockedSource | null)[]): BlockedSource[] {
-  return sources.filter(
-    (source, index): source is BlockedSource =>
-      source !== null && sources.findIndex((other) => other?.account === source.account) === index,
-  );
 }
 
 /**

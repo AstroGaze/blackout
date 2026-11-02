@@ -11,6 +11,7 @@ import { homeFeedTile } from './fixtures/tile';
 import watch from './fixtures/watch.html?raw';
 import { viewItem, viewItems } from './fixtures/view';
 import redditContentScript from '@/entrypoints/reddit.content';
+import xContentScript from '@/entrypoints/x.content';
 import youtubeContentScript from '@/entrypoints/youtube.content';
 
 const TILE = 'ytd-rich-item-renderer';
@@ -183,9 +184,14 @@ describe('Doing nothing when nothing needs protecting', () => {
   it('runs no content script on sites it does not handle', () => {
     expect(youtubeContentScript.matches).toEqual(['*://www.youtube.com/*']);
     expect(redditContentScript.matches).toEqual(['*://www.reddit.com/*']);
+    expect(xContentScript.matches).toEqual(['*://x.com/*']);
     const contentScripts = Object.keys(
       import.meta.glob(['/src/entrypoints/*.content.*', '/src/entrypoints/*.content/**']),
     );
-    expect(contentScripts).toEqual(['/src/entrypoints/reddit.content.ts', '/src/entrypoints/youtube.content.ts']);
+    expect(contentScripts).toEqual([
+      '/src/entrypoints/reddit.content.ts',
+      '/src/entrypoints/x.content.ts',
+      '/src/entrypoints/youtube.content.ts',
+    ]);
   });
 });
